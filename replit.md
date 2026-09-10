@@ -1,6 +1,6 @@
-# [Project name]
+# Checklist Manager
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Checklist Manager turns pasted bullet points into a persistent, Jira-style checklist with progress tracking and status statistics.
 
 ## Run & Operate
 
@@ -22,23 +22,33 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/checklist-manager` — responsive React/Vite dashboard and checklist workspace
+- `artifacts/api-server/src/routes/checklists.ts` — checklist CRUD, status updates, and statistics API
+- `lib/api-spec/openapi.yaml` — source of truth for checklist API contracts
+- `lib/db/src/schema/checklists.ts` — PostgreSQL schema for checklists and checklist items
+- `lib/api-client-react/src/generated` — generated React Query hooks and types
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Pasted text is parsed into one checklist item per non-empty line on the server, stripping common bullet and numbered-list prefixes.
+- Checklist item status is stored as a text value constrained by the API contract to `todo`, `in_progress`, `done`, or `blocked`.
+- Checklist progress and dashboard statistics are computed from persisted item rows so reloads and other sessions see the same state.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Paste bullets with an optional checklist name to create a live checklist.
+- View and switch between saved checklists.
+- Change item statuses, rename checklists, and delete checklists.
+- See completion rate, total items, status counts, progress bars, and recent activity.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep the experience direct: users should be able to paste a list and start updating statuses immediately.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run API codegen after editing `lib/api-spec/openapi.yaml`.
+- Run `pnpm --filter @workspace/db run push` after changing the database schema.
 
 ## Pointers
 

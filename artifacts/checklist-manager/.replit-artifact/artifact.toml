@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Checklist Manager"
+description = "A focused checklist workspace that turns pasted bullet points into trackable tasks, persists status changes, and summarizes progress across workstreams."
+version = "1.0.0"
+id = "artifacts/checklist-manager"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21967
+
+[services.development]
+run = "pnpm --filter @workspace/checklist-manager run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/checklist-manager", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/checklist-manager/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21967"
+BASE_PATH = "/"

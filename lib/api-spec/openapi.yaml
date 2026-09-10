@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: checklists
+    description: Checklist management and progress statistics
 paths:
   /healthz:
     get:
@@ -24,7 +26,159 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /checklists:
+    get:
+      operationId: listChecklists
+      tags: [checklists]
+      summary: List checklists
+      responses:
+        "200":
+          description: Checklist summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChecklistSummary"
+    post:
+      operationId: createChecklist
+      tags: [checklists]
+      summary: Create a checklist from pasted text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistInput"
+      responses:
+        "201":
+          description: Created checklist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checklist"
+        "400":
+          description: Invalid checklist input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /checklists/stats:
+    get:
+      operationId: getChecklistStats
+      tags: [checklists]
+      summary: Get checklist statistics
+      responses:
+        "200":
+          description: Aggregate checklist statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistStats"
+  /checklists/{id}:
+    get:
+      operationId: getChecklist
+      tags: [checklists]
+      summary: Get a checklist with its items
+      parameters:
+        - $ref: "#/components/parameters/ChecklistId"
+      responses:
+        "200":
+          description: Checklist details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checklist"
+        "404":
+          description: Checklist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      operationId: updateChecklist
+      tags: [checklists]
+      summary: Update checklist title
+      parameters:
+        - $ref: "#/components/parameters/ChecklistId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistUpdate"
+      responses:
+        "200":
+          description: Updated checklist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checklist"
+    delete:
+      operationId: deleteChecklist
+      tags: [checklists]
+      summary: Delete a checklist
+      parameters:
+        - $ref: "#/components/parameters/ChecklistId"
+      responses:
+        "204":
+          description: Checklist deleted
+        "404":
+          description: Checklist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /checklists/{checklistId}/items/{itemId}:
+    patch:
+      operationId: updateChecklistItem
+      tags: [checklists]
+      summary: Update a checklist item
+      parameters:
+        - $ref: "#/components/parameters/ChecklistItemChecklistId"
+        - $ref: "#/components/parameters/ChecklistItemId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistItemUpdate"
+      responses:
+        "200":
+          description: Updated checklist item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+        "404":
+          description: Checklist item not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
+  parameters:
+    ChecklistId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    ChecklistItemChecklistId:
+      name: checklistId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    ChecklistItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +187,141 @@ components:
           type: string
       required:
         - status
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    ChecklistStatus:
+      type: string
+      enum: [todo, in_progress, done, blocked]
+    ChecklistItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        checklistId:
+          type: integer
+        position:
+          type: integer
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/ChecklistStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, checklistId, position, title, status, createdAt, updatedAt]
+    Checklist:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        sourceText:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        totalItems:
+          type: integer
+        completedItems:
+          type: integer
+        progress:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistItem"
+      required: [id, title, sourceText, createdAt, updatedAt, totalItems, completedItems, progress, items]
+    ChecklistSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        totalItems:
+          type: integer
+        completedItems:
+          type: integer
+        progress:
+          type: integer
+      required: [id, title, createdAt, updatedAt, totalItems, completedItems, progress]
+    ChecklistInput:
+      type: object
+      properties:
+        title:
+          type: string
+        sourceText:
+          type: string
+          minLength: 1
+      required: [sourceText]
+    ChecklistUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+      required: [title]
+    ChecklistItemUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/ChecklistStatus"
+      minProperties: 1
+    ChecklistStats:
+      type: object
+      properties:
+        totalChecklists:
+          type: integer
+        totalItems:
+          type: integer
+        completedItems:
+          type: integer
+        inProgressItems:
+          type: integer
+        blockedItems:
+          type: integer
+        todoItems:
+          type: integer
+        completionRate:
+          type: integer
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistActivity"
+      required: [totalChecklists, totalItems, completedItems, inProgressItems, blockedItems, todoItems, completionRate, recentActivity]
+    ChecklistActivity:
+      type: object
+      properties:
+        checklistId:
+          type: integer
+        checklistTitle:
+          type: string
+        itemTitle:
+          type: string
+        status:
+          $ref: "#/components/schemas/ChecklistStatus"
+        updatedAt:
+          type: string
+          format: date-time
+      required: [checklistId, checklistTitle, itemTitle, status, updatedAt]
 

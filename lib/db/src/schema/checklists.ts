@@ -1,0 +1,40 @@
+import { createInsertSchema } from "drizzle-zod";
+import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { z } from "zod/v4";
+
+export const checklistsTable = pgTable("checklists", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  sourceText: text("source_text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const checklistItemsTable = pgTable("checklist_items", {
+  id: serial("id").primaryKey(),
+  checklistId: integer("checklist_id")
+    .notNull()
+    .references(() => checklistsTable.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("todo"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const insertChecklistSchema = createInsertSchema(checklistsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertChecklistItemSchema = createInsertSchema(checklistItemsTable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Checklist = typeof checklistsTable.$inferSelect;
+export type ChecklistItem = typeof checklistItemsTable.$inferSelect;
+export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
+export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;
