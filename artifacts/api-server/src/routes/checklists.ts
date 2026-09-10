@@ -23,6 +23,11 @@ const statusValues = ["todo", "in_progress", "done", "blocked"] as const;
 type ChecklistStatus = (typeof statusValues)[number];
 
 function parsePastedItems(sourceText: string): string[] {
+  const workflowCodes = sourceText.match(/\b\d{3}_[a-z0-9]+(?:_[a-z0-9]+)*\b/gi);
+  if (workflowCodes && workflowCodes.length > 1) {
+    return workflowCodes;
+  }
+
   return sourceText
     .split(/\r?\n/)
     .map((line) =>

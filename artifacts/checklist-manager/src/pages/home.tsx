@@ -25,7 +25,7 @@ import {
   useUpdateChecklist,
   useUpdateChecklistItem,
 } from '@workspace/api-client-react';
-import type { ChecklistItem, ChecklistStatus } from '@workspace/api-client-react';
+import type { Checklist, ChecklistItem, ChecklistStatus } from '@workspace/api-client-react';
 
 const statuses: ChecklistStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
 const statusLabels: Record<ChecklistStatus, string> = {
@@ -34,6 +34,13 @@ const statusLabels: Record<ChecklistStatus, string> = {
   done: 'Done',
   blocked: 'Blocked',
 };
+
+function normalizeSourceText(value: string) {
+  const trimmed = value.trim();
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  const looksLikeWorkflowIdentifiers = tokens.length > 1 && tokens.every((token) => /^\d{3}_[\w-]+$/.test(token));
+  return looksLikeWorkflowIdentifiers ? tokens.join('\n') : trimmed;
+}
 
 function formatRelative(dateValue: string) {
   const seconds = Math.round((Date.now() - new Date(dateValue).getTime()) / 1000);
@@ -46,6 +53,23 @@ function formatRelative(dateValue: string) {
 
 function formatDate(dateValue: string) {
   return new Date(dateValue).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+function patchChecklistItem(queryClient: ReturnType<typeof useQueryClient>, checklistId: number, updatedItem: ChecklistItem) {
+  queryClient.setQueryData<Checklist | undefined>(getGetChecklistQueryKey(checklistId), (old) => {
+    if (!old?.items) return old;
+    const items = old.items.map((current) => current.id === updatedItem.id ? updatedItem : current);
+    const completedItems = items.filter((item) => item.status === 'done').length;
+    return {
+      ...old,
+      items,
+      totalItems: items.length,
+      completedItems,
+      progress: items.length ? (completedItems / items.length) * 100 : 0,
+    };
+  });
+  queryClient.invalidateQueries({ queryKey: getListChecklistsQueryKey() });
+  queryClient.invalidateQueries({ queryKey: getGetChecklistStatsQueryKey() });
 }
 
 function StatCard({ label, value, foot, primary = false }: { label: string; value: string | number; foot: string; primary?: boolean }) {
@@ -65,12 +89,7 @@ function StatusSelect({ item, checklistId, onError }: { item: ChecklistItem; che
     onError('');
     updateItem.mutate({ checklistId, itemId: item.id, data: { status } }, {
       onSuccess: (nextItem) => {
-        queryClient.setQueryData(getGetChecklistQueryKey(checklistId), (old: { items?: ChecklistItem[] } | undefined) => {
-          if (!old?.items) return old;
-          return { ...old, items: old.items.map((current) => current.id === nextItem.id ? nextItem : current) };
-        });
-        queryClient.invalidateQueries({ queryKey: getListChecklistsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetChecklistStatsQueryKey() });
+        patchChecklistItem(queryClient, checklistId, nextItem);
       },
       onError: () => onError('Could not update that item. Try again.'),
     });
@@ -97,12 +116,7 @@ function ChecklistItemRow({ item, checklistId, onError }: { item: ChecklistItem;
     const status: ChecklistStatus = item.status === 'done' ? 'todo' : 'done';
     updateItem.mutate({ checklistId, itemId: item.id, data: { status } }, {
       onSuccess: (nextItem) => {
-        queryClient.setQueryData(getGetChecklistQueryKey(checklistId), (old: { items?: ChecklistItem[] } | undefined) => {
-          if (!old?.items) return old;
-          return { ...old, items: old.items.map((current) => current.id === nextItem.id ? nextItem : current) };
-        });
-        queryClient.invalidateQueries({ queryKey: getListChecklistsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetChecklistStatsQueryKey() });
+        patchChecklistItem(queryClient, checklistId, nextItem);
       },
       onError: () => onError('Could not update that item. Try again.'),
     });
@@ -120,7 +134,7 @@ function ChecklistItemRow({ item, checklistId, onError }: { item: ChecklistItem;
       </button>
       <div className="item-copy">
         <div className={`item-title${item.status === 'done' ? ' done' : ''}`} data-testid={`text-item-title-${item.id}`}>{item.title}</div>
-        <div className="item-sub">{statusLabels[item.status]}</div>
+        <div className={`item-sub item-status-${item.status}`}>{statusLabels[item.status]}</div>
       </div>
       <StatusSelect item={item} checklistId={checklistId} onError={onError} />
     </div>
@@ -154,6 +168,15 @@ function Home() {
   const listCountLabel = useMemo(() => `${summaries.length} ${summaries.length === 1 ? 'list' : 'lists'}`, [summaries.length]);
   const firstSummaryId = summaries[0]?.id ?? null;
   const firstSummaryTitle = summaries[0]?.title ?? '';
+  const normalizedSourceText = useMemo(() => normalizeSourceText(sourceText), [sourceText]);
+  const sourceLineCount = normalizedSourceText ? normalizedSourceText.split('\n').filter(Boolean).length : 0;
+  const statusTotals = useMemo(() => [
+    { key: 'todo' as const, label: statusLabels.todo, value: stats.data?.todoItems ?? 0 },
+    { key: 'in_progress' as const, label: statusLabels.in_progress, value: stats.data?.inProgressItems ?? 0 },
+    { key: 'done' as const, label: statusLabels.done, value: stats.data?.completedItems ?? 0 },
+    { key: 'blocked' as const, label: statusLabels.blocked, value: stats.data?.blockedItems ?? 0 },
+  ], [stats.data?.blockedItems, stats.data?.completedItems, stats.data?.inProgressItems, stats.data?.todoItems]);
+  const statusTotal = statusTotals.reduce((sum, item) => sum + item.value, 0);
 
   useEffect(() => {
     if (selectedId === null && firstSummaryId !== null) {
@@ -166,7 +189,7 @@ function Home() {
     event.preventDefault();
     if (!sourceText.trim()) return;
     setMutationMessage('');
-    createChecklist.mutate({ data: { sourceText: sourceText.trim(), ...(newTitle.trim() ? { title: newTitle.trim() } : {}) } }, {
+    createChecklist.mutate({ data: { sourceText: normalizedSourceText, ...(newTitle.trim() ? { title: newTitle.trim() } : {}) } }, {
       onSuccess: (created) => {
         setSourceText('');
         setNewTitle('');
@@ -265,6 +288,57 @@ function Home() {
             )}
           </section>
 
+          <section className="visual-summary-grid" aria-label="Progress visual summaries">
+            <div className="surface insight-panel" data-testid="panel-status-distribution">
+              <div className="surface-header">
+                <div>
+                  <h2 className="section-title">Status balance</h2>
+                  <p className="insight-caption">Where the work is sitting now</p>
+                </div>
+                <span className="section-meta">{statusTotal} items</span>
+              </div>
+              {stats.isLoading ? (
+                <div className="insight-loading"><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line short" /></div>
+              ) : stats.error ? (
+                <div className="insight-empty">Status distribution is unavailable while stats reconnect.</div>
+              ) : statusTotal === 0 ? (
+                <div className="insight-empty" data-testid="status-distribution-empty">Add a checklist to see the work spread.</div>
+              ) : (
+                <div className="insight-content">
+                  <div className="distribution-bar" aria-label="Status distribution">
+                    {statusTotals.map((item) => item.value > 0 && <div key={item.key} className={`distribution-segment segment-${item.key}`} style={{ width: `${(item.value / statusTotal) * 100}%` }} title={`${item.label}: ${item.value}`} data-testid={`segment-status-${item.key}`} />)}
+                  </div>
+                  <div className="status-legend">
+                    {statusTotals.map((item) => <div className="legend-item" key={item.key} data-testid={`legend-status-${item.key}`}><span className={`legend-dot dot-${item.key}`} /><span>{item.label}</span><strong>{item.value}</strong></div>)}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="surface insight-panel" data-testid="panel-checklist-comparison">
+              <div className="surface-header">
+                <div>
+                  <h2 className="section-title">List momentum</h2>
+                  <p className="insight-caption">Progress by checklist</p>
+                </div>
+                <span className="section-meta">{listCountLabel}</span>
+              </div>
+              {lists.isLoading ? (
+                <div className="insight-loading"><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line short" /></div>
+              ) : isListError ? (
+                <div className="insight-empty">Checklist comparison is unavailable while lists reconnect.</div>
+              ) : summaries.length === 0 ? (
+                <div className="insight-empty" data-testid="checklist-comparison-empty">Your checklist progress will compare here.</div>
+              ) : (
+                <div className="comparison-list">
+                  {summaries.slice(0, 6).map((summary) => <div className="comparison-row" key={summary.id} data-testid={`comparison-checklist-${summary.id}`}>
+                    <div className="compare-label"><span title={summary.title}>{summary.title}</span><strong>{Math.round(summary.progress)}%</strong></div>
+                    <div className="compare-track"><div className="compare-fill" style={{ width: `${Math.min(100, Math.max(0, summary.progress))}%` }} /></div>
+                  </div>)}
+                </div>
+              )}
+            </div>
+          </section>
+
           <div className="workspace-grid">
             <section>
               <div className="paste-panel">
@@ -272,7 +346,7 @@ function Home() {
                   <div className="paste-icon"><Zap size={15} /></div>
                   <div className="paste-copy">
                     <h2>Drop in the messy version.</h2>
-                    <p>Paste bullets, one per line. We’ll turn them into a queue you can actually move through.</p>
+                    <p>Paste bullets on separate lines, or drop in a compact workflow line. We’ll turn it into a queue you can move through.</p>
                   </div>
                 </div>
                 <form className="paste-form" onSubmit={handleCreate}>
@@ -285,7 +359,7 @@ function Home() {
                     <textarea id="source-text" className="text-area" value={sourceText} onChange={(event) => setSourceText(event.target.value)} placeholder={'Confirm launch date\nSend the revised deck\nAsk Priya for the numbers'} data-testid="textarea-source-text" />
                   </div>
                   <div className="button-row">
-                    <span className="inline-message">{sourceText.trim() ? `${sourceText.trim().split(/\n+/).filter(Boolean).length} lines ready` : 'Nothing queued yet'}</span>
+                    <span className="inline-message">{sourceText.trim() ? `${sourceLineCount} ${sourceLineCount === 1 ? 'item' : 'items'} ready` : 'Nothing queued yet'}</span>
                     <button type="submit" className="primary-button" disabled={!sourceText.trim() || createChecklist.isPending} data-testid="button-create-checklist">
                       {createChecklist.isPending ? <><LoaderCircle size={13} className="animate-spin" /> Creating…</> : <><FilePlus2 size={13} /> Create list</>}
                     </button>
