@@ -198,3 +198,31 @@ export const UpdateChecklistItemResponse = zod.object({
 })
 
 
+/**
+ * @summary Add an item to a checklist
+ */
+
+
+
+export const CreateChecklistItemParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const CreateChecklistItemBody = zod.object({
+  "title": zod.string().min(1)
+})
+
+export const CreateChecklistItemResponse = zod.object({
+  "id": zod.number().int(),
+  "checklistId": zod.number().int(),
+  "position": zod.number().int(),
+  "title": zod.string(),
+  "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+

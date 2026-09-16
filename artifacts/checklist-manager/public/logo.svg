@@ -1,0 +1,7 @@
+<svg width="160" height="48" viewBox="0 0 160 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="2" y="4" width="40" height="40" rx="12" fill="#9BC53D"/>
+  <path d="M14 24.5L20.5 31L31 18" stroke="#28213B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M55 17H67.5C70.2614 17 72.5 19.2386 72.5 22V26C72.5 28.7614 70.2614 31 67.5 31H55V17Z" fill="#28213B"/>
+  <path d="M79 16H84V32H79V16ZM88 16H93V32H88V16ZM97 16H102V32H97V16Z" fill="#28213B"/>
+  <text x="55" y="40" fill="#28213B" font-family="Arial, sans-serif" font-size="10" letter-spacing="2">DAYMARK</text>
+</svg>

@@ -72,6 +72,11 @@ export interface ChecklistItemUpdate {
   status?: ChecklistStatus;
 }
 
+export interface ChecklistItemInput {
+  /** @minLength 1 */
+  title: string;
+}
+
 export interface ChecklistActivity {
   checklistId: number;
   checklistTitle: string;

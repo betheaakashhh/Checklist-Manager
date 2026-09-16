@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useClerk, useUser } from '@clerk/react';
 import {
   Check,
   ClipboardList,
@@ -8,12 +9,15 @@ import {
   ListChecks,
   LoaderCircle,
   MoreHorizontal,
+  Plus,
   RefreshCw,
   Trash2,
   TriangleAlert,
   Zap,
 } from 'lucide-react';
+import { useLocation } from 'wouter';
 import {
+  useCreateChecklistItem,
   getGetChecklistQueryKey,
   getGetChecklistStatsQueryKey,
   getListChecklistsQueryKey,
@@ -25,7 +29,7 @@ import {
   useUpdateChecklist,
   useUpdateChecklistItem,
 } from '@workspace/api-client-react';
-import type { Checklist, ChecklistItem, ChecklistStatus } from '@workspace/api-client-react';
+import type { Checklist, ChecklistActivity, ChecklistItem, ChecklistStatus } from '@workspace/api-client-react';
 
 const statuses: ChecklistStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
 const statusLabels: Record<ChecklistStatus, string> = {
@@ -122,7 +126,7 @@ function ChecklistItemRow({ item, checklistId, onError }: { item: ChecklistItem;
     });
   };
   return (
-    <div className="item-row" data-testid={`row-checklist-item-${item.id}`}>
+    <div className={`item-row status-row-${item.status}`} data-testid={`row-checklist-item-${item.id}`}>
       <button
         className={`check-button${item.status === 'done' ? ' done' : ''}`}
         onClick={toggleDone}
@@ -141,13 +145,95 @@ function ChecklistItemRow({ item, checklistId, onError }: { item: ChecklistItem;
   );
 }
 
+function AuthControl() {
+  const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut } = useClerk();
+  const [, setLocation] = useLocation();
+
+  if (!isLoaded) return <div className="auth-skeleton" aria-label="Loading account" />;
+  if (!isSignedIn) {
+    return (
+      <div className="auth-control" data-testid="auth-signed-out">
+        <button className="auth-button auth-button-quiet" onClick={() => setLocation('/sign-in')} data-testid="button-auth-login">Log in</button>
+        <button className="auth-button auth-button-primary" onClick={() => setLocation('/sign-up')} data-testid="button-auth-signup">Sign up</button>
+      </div>
+    );
+  }
+
+  const displayName = user.firstName?.trim() || user.primaryEmailAddress?.emailAddress || 'Account';
+  return (
+    <div className="auth-control" data-testid="auth-signed-in">
+      <span className="auth-greeting" title={user.primaryEmailAddress?.emailAddress}>{displayName}</span>
+      <button className="auth-button auth-button-quiet" onClick={() => void signOut()} data-testid="button-auth-signout">Sign out</button>
+    </div>
+  );
+}
+
+function Modal({
+  title,
+  description,
+  children,
+  onClose,
+}: {
+  title: string;
+  description: string;
+    children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Daymark workspace</p>
+            <h2 id="modal-title" className="modal-title">{title}</h2>
+            <p className="modal-description">{description}</p>
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close dialog">×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ActivityFeed({ activity, isLoading, hasError }: { activity: ChecklistActivity[]; isLoading: boolean; hasError: boolean }) {
+  return (
+    <div className="surface activity-panel activity-page-panel">
+      <div className="surface-header">
+        <div>
+          <h2 className="section-title">Recent movement</h2>
+          <p className="insight-caption">A running record of what changed across your queues.</p>
+        </div>
+        <MoreHorizontal size={16} color="hsl(var(--muted-foreground))" />
+      </div>
+      {isLoading ? (
+        <div className="skeleton-list" data-testid="status-activity-loading"><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line short" /></div>
+      ) : hasError ? (
+        <div className="empty-state" data-testid="status-activity-error"><TriangleAlert size={20} /><strong>Activity is taking a moment.</strong><p>Refresh the workspace to try again.</p></div>
+      ) : activity.length === 0 ? (
+        <div className="empty-state" data-testid="status-activity-empty"><Clock3 size={22} /><strong>Quiet so far.</strong><p>Status changes will show up here.</p></div>
+      ) : (
+        <div className="activity-list">{activity.map((entry, index) => <div className="activity-row" key={`${entry.checklistId}-${entry.updatedAt}-${index}`}><span className={`activity-dot ${entry.status}`} /><div><div className="activity-title">{entry.itemTitle}</div><div className="activity-context">{entry.checklistTitle} · {statusLabels[entry.status]}</div></div><span className="activity-time">{formatRelative(entry.updatedAt)}</span></div>)}</div>
+      )}
+    </div>
+  );
+}
+
 function Home() {
   const queryClient = useQueryClient();
+  const [activeSection, setActiveSection] = useState<'overview' | 'checklists' | 'activity'>('checklists');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [sourceText, setSourceText] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
   const [mutationMessage, setMutationMessage] = useState('');
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [newItemTitle, setNewItemTitle] = useState('');
+  const [addItemMessage, setAddItemMessage] = useState('');
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const lists = useListChecklists();
   const stats = useGetChecklistStats();
@@ -155,6 +241,7 @@ function Home() {
     query: { enabled: selectedId !== null, queryKey: getGetChecklistQueryKey(selectedId ?? 0) },
   });
   const createChecklist = useCreateChecklist();
+  const createChecklistItem = useCreateChecklistItem();
   const updateChecklist = useUpdateChecklist();
   const deleteChecklist = useDeleteChecklist();
 
@@ -224,11 +311,17 @@ function Home() {
   };
 
   const handleDelete = () => {
-    if (!selected || !window.confirm(`Delete "${selected.title}"? This cannot be undone.`)) return;
+    if (!selected) return;
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!selected) return;
     setMutationMessage('');
     const removedId = selected.id;
     deleteChecklist.mutate({ id: removedId }, {
       onSuccess: () => {
+        setIsDeleteConfirmOpen(false);
         const next = summaries.find((item) => item.id !== removedId);
         setSelectedId(next?.id ?? null);
         setTitleDraft(next?.title ?? '');
@@ -240,9 +333,39 @@ function Home() {
     });
   };
 
-  const jumpTo = (targetId: string) => {
-    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const handleAddItem = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selected || !newItemTitle.trim()) return;
+    setAddItemMessage('');
+    createChecklistItem.mutate({ id: selected.id, data: { title: newItemTitle.trim() } }, {
+      onSuccess: (createdItem) => {
+        queryClient.setQueryData<Checklist | undefined>(getGetChecklistQueryKey(selected.id), (old) => {
+          if (!old) return old;
+          const items = [...old.items, createdItem].sort((a, b) => a.position - b.position);
+          const completedItems = items.filter((item) => item.status === 'done').length;
+          return {
+            ...old,
+            items,
+            totalItems: items.length,
+            completedItems,
+            progress: items.length ? (completedItems / items.length) * 100 : 0,
+          };
+        });
+        queryClient.invalidateQueries({ queryKey: getListChecklistsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetChecklistStatsQueryKey() });
+        setNewItemTitle('');
+        setAddItemMessage('');
+        setIsAddItemOpen(false);
+      },
+      onError: () => setAddItemMessage('Could not add that item. Try again.'),
+    });
   };
+
+  const sectionCopy = {
+    overview: { eyebrow: 'Monday planning desk', title: 'Make a dent.', subtitle: 'A clear read on the work that matters today.' },
+    checklists: { eyebrow: 'Work queue', title: 'Get to clear.', subtitle: 'Paste the rough version, then move each item forward.' },
+    activity: { eyebrow: 'Workspace pulse', title: 'Keep the motion visible.', subtitle: 'A quick record of what changed across your queues.' },
+  }[activeSection];
 
   return (
     <div className="app-shell">
@@ -253,8 +376,9 @@ function Home() {
         </div>
         <div className="sidebar-kicker">Workspace</div>
         <nav className="side-nav" aria-label="Main navigation">
-          <button className="side-nav-item active" onClick={() => jumpTo('overview-top')} data-testid="button-nav-overview"><ListChecks size={16} /><span>Overview</span></button>
-          <button className="side-nav-item" onClick={() => jumpTo('recent-activity')} data-testid="button-nav-recent"><Clock3 size={16} /><span>Recent activity</span></button>
+          <button className={`side-nav-item${activeSection === 'overview' ? ' active' : ''}`} onClick={() => setActiveSection('overview')} aria-current={activeSection === 'overview' ? 'page' : undefined} data-testid="button-nav-overview"><ListChecks size={16} /><span>Overview</span></button>
+          <button className={`side-nav-item${activeSection === 'checklists' ? ' active' : ''}`} onClick={() => setActiveSection('checklists')} aria-current={activeSection === 'checklists' ? 'page' : undefined} data-testid="button-nav-checklists"><ClipboardList size={16} /><span>Checklists</span></button>
+          <button className={`side-nav-item${activeSection === 'activity' ? ' active' : ''}`} onClick={() => setActiveSection('activity')} aria-current={activeSection === 'activity' ? 'page' : undefined} data-testid="button-nav-recent"><Clock3 size={16} /><span>Recent activity</span></button>
         </nav>
         <div className="sidebar-note">
           <strong>Small steps, visible.</strong>
@@ -266,13 +390,17 @@ function Home() {
         <div className="content-wrap" id="overview-top">
           <header className="topbar">
             <div>
-              <p className="eyebrow">Monday planning desk</p>
-              <h1 className="page-title" data-testid="text-page-title">Make a dent.</h1>
-              <p className="page-subtitle">A clear queue for the work that matters today.</p>
+              <p className="eyebrow">{sectionCopy.eyebrow}</p>
+              <h1 className="page-title" data-testid="text-page-title">{sectionCopy.title}</h1>
+              <p className="page-subtitle">{sectionCopy.subtitle}</p>
             </div>
-            <div className="date-stamp" data-testid="text-current-date">{formatDate(new Date().toISOString())}</div>
+            <div className="topbar-right">
+              <div className="date-stamp" data-testid="text-current-date">{formatDate(new Date().toISOString())}</div>
+              <AuthControl />
+            </div>
           </header>
 
+          {activeSection === 'overview' && <section className="overview-page" aria-label="Checklist overview">
           <section className="stats-grid" aria-label="Checklist statistics">
             {stats.isLoading ? (
               [1, 2, 3, 4].map((item) => <div className="stat-card" key={item}><div className="skeleton skeleton-line short" /><div className="skeleton skeleton-line" style={{ marginTop: 18 }} /></div>)
@@ -338,8 +466,9 @@ function Home() {
               )}
             </div>
           </section>
+          </section>}
 
-          <div className="workspace-grid">
+          {activeSection === 'checklists' && <div className="workspace-grid checklist-page" id="checklists-page">
             <section>
               <div className="paste-panel">
                 <div className="paste-heading">
@@ -410,6 +539,7 @@ function Home() {
                       </div>
                       <div className="detail-actions">
                         <button className="danger-button" onClick={handleDelete} disabled={deleteChecklist.isPending} data-testid="button-delete-checklist"><Trash2 size={13} /> <span className="sr-only">Delete list</span></button>
+                        <button className="quiet-button" onClick={() => { setNewItemTitle(''); setAddItemMessage(''); setIsAddItemOpen(true); }} disabled={!selected} data-testid="button-add-checklist-item"><Plus size={13} /> <span className="sr-only">Add item</span></button>
                         <button className="quiet-button" onClick={() => selectedQuery.refetch()} data-testid="button-refresh-checklist"><RefreshCw size={13} /></button>
                       </div>
                     </div>
@@ -425,14 +555,56 @@ function Home() {
                 )}
               </div>
 
-              <div className="surface activity-panel" id="recent-activity">
-                <div className="surface-header"><h2 className="section-title">Recent movement</h2><MoreHorizontal size={16} color="hsl(var(--muted-foreground))" /></div>
-                {stats.isLoading ? <div className="skeleton-list"><div className="skeleton skeleton-line" /><div className="skeleton skeleton-line" /></div> : activity.length === 0 ? <div className="empty-state" style={{ padding: '25px 18px' }}><Clock3 size={20} /><strong>Quiet so far.</strong><p>Status changes will show up here.</p></div> : <div className="activity-list">{activity.slice(0, 5).map((entry, index) => <div className="activity-row" key={`${entry.checklistId}-${entry.updatedAt}-${index}`}><span className={`activity-dot ${entry.status}`} /><div><div className="activity-title">{entry.itemTitle}</div><div className="activity-context">{entry.checklistTitle} · {statusLabels[entry.status]}</div></div><span className="activity-time">{formatRelative(entry.updatedAt)}</span></div>)}</div>}
-              </div>
             </section>
           </div>
+          }
+
+          {activeSection === 'activity' && <section className="activity-page" id="recent-activity" aria-label="Recent activity">
+            <ActivityFeed activity={activity} isLoading={stats.isLoading} hasError={Boolean(stats.error)} />
+          </section>}
         </div>
       </main>
+      {isAddItemOpen && selected && (
+        <Modal
+          title="Add one more move"
+          description={`Add a new item to “${selected.title}”. It will start as To do.`}
+          onClose={() => { if (!createChecklistItem.isPending) setIsAddItemOpen(false); }}
+        >
+          <form className="modal-form" onSubmit={handleAddItem}>
+            <label className="field-label" htmlFor="new-item-title">Item name</label>
+            <input
+              id="new-item-title"
+              className="text-input"
+              value={newItemTitle}
+              onChange={(event) => setNewItemTitle(event.target.value)}
+              placeholder="e.g. Review the signed agreement"
+              autoFocus
+              data-testid="input-new-checklist-item"
+            />
+            {addItemMessage && <div className="error-message" data-testid="status-add-item-error">{addItemMessage}</div>}
+            <div className="modal-actions">
+              <button type="button" className="quiet-button" onClick={() => setIsAddItemOpen(false)} disabled={createChecklistItem.isPending}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={!newItemTitle.trim() || createChecklistItem.isPending} data-testid="button-submit-checklist-item">
+                {createChecklistItem.isPending ? <><LoaderCircle size={13} className="animate-spin" /> Adding…</> : <><Plus size={13} /> Add item</>}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {isDeleteConfirmOpen && selected && (
+        <Modal
+          title="Delete this checklist?"
+          description={`“${selected.title}” and its items will be removed. This cannot be undone.`}
+          onClose={() => { if (!deleteChecklist.isPending) setIsDeleteConfirmOpen(false); }}
+        >
+          <div className="modal-actions modal-actions-delete">
+            <button type="button" className="quiet-button" onClick={() => setIsDeleteConfirmOpen(false)} disabled={deleteChecklist.isPending}>Keep it</button>
+            <button type="button" className="danger-button danger-confirm" onClick={confirmDelete} disabled={deleteChecklist.isPending}>
+              {deleteChecklist.isPending ? <><LoaderCircle size={13} className="animate-spin" /> Deleting…</> : <><Trash2 size={13} /> Delete checklist</>}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

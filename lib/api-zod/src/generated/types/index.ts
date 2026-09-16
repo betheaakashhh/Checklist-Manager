@@ -10,6 +10,7 @@ export * from './checklist';
 export * from './checklistActivity';
 export * from './checklistInput';
 export * from './checklistItem';
+export * from './checklistItemInput';
 export * from './checklistItemUpdate';
 export * from './checklistStats';
 export * from './checklistStatus';

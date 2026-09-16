@@ -10,6 +10,7 @@ export type AuthTokenGetter = () => Promise<string | null> | string | null;
 
 const NO_BODY_STATUS = new Set([204, 205, 304]);
 const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
+const ANONYMOUS_ID_STORAGE_KEY = "daymark-anonymous-id";
 
 // ---------------------------------------------------------------------------
 // Module-level configuration
@@ -89,6 +90,24 @@ function mergeHeaders(...sources: Array<HeadersInit | undefined>): Headers {
   }
 
   return headers;
+}
+
+function getAnonymousId(): string | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const existing = window.localStorage.getItem(ANONYMOUS_ID_STORAGE_KEY);
+    if (existing) return existing;
+
+    const generated =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `browser-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(ANONYMOUS_ID_STORAGE_KEY, generated);
+    return generated;
+  } catch {
+    return null;
+  }
 }
 
 function getMediaType(headers: Headers): string | null {
@@ -336,6 +355,11 @@ export async function customFetch<T = unknown>(
   }
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
+
+  const anonymousId = getAnonymousId();
+  if (anonymousId && !headers.has("x-anonymous-id")) {
+    headers.set("x-anonymous-id", anonymousId);
+  }
 
   if (
     typeof init.body === "string" &&

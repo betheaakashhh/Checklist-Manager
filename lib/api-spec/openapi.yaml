@@ -156,6 +156,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /checklists/{id}/items:
+    post:
+      operationId: createChecklistItem
+      tags: [checklists]
+      summary: Add an item to a checklist
+      parameters:
+        - $ref: "#/components/parameters/ChecklistId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistItemInput"
+      responses:
+        "201":
+          description: Created checklist item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+        "404":
+          description: Checklist not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   parameters:
     ChecklistId:
@@ -287,6 +313,13 @@ components:
         status:
           $ref: "#/components/schemas/ChecklistStatus"
       minProperties: 1
+    ChecklistItemInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+      required: [title]
     ChecklistStats:
       type: object
       properties:
