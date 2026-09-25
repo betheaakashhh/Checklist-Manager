@@ -16,5 +16,8 @@ export * from './checklistStats';
 export * from './checklistStatus';
 export * from './checklistSummary';
 export * from './checklistUpdate';
+export * from './collection';
+export * from './collectionInput';
+export * from './collectionUpdate';
 export * from './error';
 export * from './healthStatus';

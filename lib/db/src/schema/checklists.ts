@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { z } from "zod/v4";
 
 export const checklistsTable = pgTable("checklists", {
@@ -22,6 +22,34 @@ export const checklistItemsTable = pgTable("checklist_items", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const collectionsTable = pgTable("collections", {
+  id: serial("id").primaryKey(),
+  ownerId: text("owner_id"),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const collectionChecklistsTable = pgTable(
+  "collection_checklists",
+  {
+    id: serial("id").primaryKey(),
+    collectionId: integer("collection_id")
+      .notNull()
+      .references(() => collectionsTable.id, { onDelete: "cascade" }),
+    checklistId: integer("checklist_id")
+      .notNull()
+      .references(() => checklistsTable.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("collection_checklists_collection_checklist_unique").on(
+      table.collectionId,
+      table.checklistId,
+    ),
+  ],
+);
 
 export const insertChecklistSchema = createInsertSchema(checklistsTable).omit({
   id: true,

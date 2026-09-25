@@ -12,7 +12,120 @@ tags:
     description: Health operations
   - name: checklists
     description: Checklist management and progress statistics
+  - name: collections
+    description: Named folders that group checklists
 paths:
+  /collections:
+    get:
+      operationId: listCollections
+      tags: [collections]
+      summary: List checklist collections
+      responses:
+        "200":
+          description: Collections with their checklist summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Collection"
+    post:
+      operationId: createCollection
+      tags: [collections]
+      summary: Create a collection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectionInput"
+      responses:
+        "201":
+          description: Created collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+  /collections/{id}:
+    patch:
+      operationId: updateCollection
+      tags: [collections]
+      summary: Rename a collection
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CollectionUpdate"
+      responses:
+        "200":
+          description: Updated collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Collection"
+        "404":
+          description: Collection not found
+    delete:
+      operationId: deleteCollection
+      tags: [collections]
+      summary: Delete a collection without deleting its checklists
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+      responses:
+        "204":
+          description: Collection deleted; checklists remain available
+        "404":
+          description: Collection not found
+  /collections/{id}/checklists:
+    post:
+      operationId: createCollectionChecklist
+      tags: [collections]
+      summary: Create a checklist inside a collection
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistInput"
+      responses:
+        "201":
+          description: Created checklist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checklist"
+        "404":
+          description: Collection not found
+  /collections/{id}/checklists/{checklistId}:
+    put:
+      operationId: addChecklistToCollection
+      tags: [collections]
+      summary: Add an existing checklist to a collection
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/ChecklistIdByPath"
+      responses:
+        "204":
+          description: Checklist added to collection
+        "404":
+          description: Collection or checklist not found
+    delete:
+      operationId: removeChecklistFromCollection
+      tags: [collections]
+      summary: Remove a checklist from a collection without deleting it
+      parameters:
+        - $ref: "#/components/parameters/CollectionId"
+        - $ref: "#/components/parameters/ChecklistIdByPath"
+      responses:
+        "204":
+          description: Checklist removed from collection
+        "404":
+          description: Collection or checklist not found
   /healthz:
     get:
       operationId: healthCheck
@@ -184,6 +297,20 @@ paths:
                 $ref: "#/components/schemas/Error"
 components:
   parameters:
+    CollectionId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    ChecklistIdByPath:
+      name: checklistId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
     ChecklistId:
       name: id
       in: path
@@ -288,6 +415,38 @@ components:
         progress:
           type: integer
       required: [id, title, createdAt, updatedAt, totalItems, completedItems, progress]
+    Collection:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        checklists:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistSummary"
+      required: [id, name, createdAt, updatedAt, checklists]
+    CollectionInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+      required: [name]
+    CollectionUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+      required: [name]
     ChecklistInput:
       type: object
       properties:

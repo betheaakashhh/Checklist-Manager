@@ -55,6 +55,24 @@ export interface ChecklistSummary {
   progress: number;
 }
 
+export interface Collection {
+  id: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  checklists: ChecklistSummary[];
+}
+
+export interface CollectionInput {
+  /** @minLength 1 */
+  name: string;
+}
+
+export interface CollectionUpdate {
+  /** @minLength 1 */
+  name: string;
+}
+
 export interface ChecklistInput {
   title?: string;
   /** @minLength 1 */

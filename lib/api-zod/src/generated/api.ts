@@ -9,6 +9,170 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary List checklist collections
+ */
+export const ListCollectionsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "checklists": zod.array(zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int()
+}))
+})
+export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem)
+
+
+/**
+ * @summary Create a collection
+ */
+
+
+
+export const CreateCollectionBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+export const CreateCollectionResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "checklists": zod.array(zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int()
+}))
+})
+
+
+/**
+ * @summary Rename a collection
+ */
+
+
+
+export const UpdateCollectionParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const UpdateCollectionBody = zod.object({
+  "name": zod.string().min(1)
+})
+
+export const UpdateCollectionResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "checklists": zod.array(zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int()
+}))
+})
+
+
+/**
+ * @summary Delete a collection without deleting its checklists
+ */
+
+
+
+export const DeleteCollectionParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const DeleteCollectionResponse = zod.void()
+
+
+/**
+ * @summary Create a checklist inside a collection
+ */
+
+
+
+export const CreateCollectionChecklistParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const CreateCollectionChecklistBody = zod.object({
+  "title": zod.string().optional(),
+  "sourceText": zod.string().min(1)
+})
+
+export const CreateCollectionChecklistResponse = zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "sourceText": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int(),
+  "items": zod.array(zod.object({
+  "id": zod.number().int(),
+  "checklistId": zod.number().int(),
+  "position": zod.number().int(),
+  "title": zod.string(),
+  "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Add an existing checklist to a collection
+ */
+
+
+
+
+export const AddChecklistToCollectionParams = zod.object({
+  "id": zod.coerce.number().int().min(1),
+  "checklistId": zod.coerce.number().int().min(1)
+})
+
+export const AddChecklistToCollectionResponse = zod.void()
+
+
+/**
+ * @summary Remove a checklist from a collection without deleting it
+ */
+
+
+
+
+export const RemoveChecklistFromCollectionParams = zod.object({
+  "id": zod.coerce.number().int().min(1),
+  "checklistId": zod.coerce.number().int().min(1)
+})
+
+export const RemoveChecklistFromCollectionResponse = zod.void()
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

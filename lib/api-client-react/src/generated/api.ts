@@ -28,6 +28,9 @@ import type {
   ChecklistStats,
   ChecklistSummary,
   ChecklistUpdate,
+  Collection,
+  CollectionInput,
+  CollectionUpdate,
   Error,
   HealthStatus
 } from './api.schemas';
@@ -58,6 +61,515 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getListCollectionsUrl = () => {
+
+
+
+
+  return `/api/collections`
+}
+
+/**
+ * @summary List checklist collections
+ */
+export const listCollections = async ( options?: Parameters<typeof customFetch>[1]): Promise<Collection[]> => {
+
+  return customFetch<Collection[]>(getListCollectionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCollectionsQueryKey = () => {
+    return [
+    `/api/collections`
+    ] as const;
+    }
+
+
+export const getListCollectionsQueryOptions = <TData = Awaited<ReturnType<typeof listCollections>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCollectionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCollections>>> = ({ signal }) => listCollections({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCollectionsQueryResult = NonNullable<Awaited<ReturnType<typeof listCollections>>>
+export type ListCollectionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List checklist collections
+ */
+
+export function useListCollections<TData = Awaited<ReturnType<typeof listCollections>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollections>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCollectionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateCollectionUrl = () => {
+
+
+
+
+  return `/api/collections`
+}
+
+/**
+ * @summary Create a collection
+ */
+export const createCollection = async (collectionInput: CollectionInput, options?: Parameters<typeof customFetch>[1]): Promise<Collection> => {
+
+  return customFetch<Collection>(getCreateCollectionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(collectionInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCollectionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCollection>>, TError,{data: BodyType<CollectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCollection>>, TError,{data: BodyType<CollectionInput>}, TContext> => {
+
+const mutationKey = ['createCollection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCollection>>, {data: BodyType<CollectionInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCollection(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCollectionMutationResult = NonNullable<Awaited<ReturnType<typeof createCollection>>>
+    export type CreateCollectionMutationBody = BodyType<CollectionInput>
+    export type CreateCollectionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a collection
+ */
+export const useCreateCollection = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCollection>>, TError,{data: BodyType<CollectionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCollection>>,
+        TError,
+        {data: BodyType<CollectionInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCollectionMutationOptions(options));
+    }
+
+export const getUpdateCollectionUrl = (id: number,) => {
+
+
+
+
+  return `/api/collections/${id}`
+}
+
+/**
+ * @summary Rename a collection
+ */
+export const updateCollection = async (id: number,
+    collectionUpdate: CollectionUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Collection> => {
+
+  return customFetch<Collection>(getUpdateCollectionUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(collectionUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateCollectionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCollection>>, TError,{id: number;data: BodyType<CollectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateCollection>>, TError,{id: number;data: BodyType<CollectionUpdate>}, TContext> => {
+
+const mutationKey = ['updateCollection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateCollection>>, {id: number;data: BodyType<CollectionUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateCollection(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateCollectionMutationResult = NonNullable<Awaited<ReturnType<typeof updateCollection>>>
+    export type UpdateCollectionMutationBody = BodyType<CollectionUpdate>
+    export type UpdateCollectionMutationError = ErrorType<void>
+
+    /**
+ * @summary Rename a collection
+ */
+export const useUpdateCollection = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateCollection>>, TError,{id: number;data: BodyType<CollectionUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateCollection>>,
+        TError,
+        {id: number;data: BodyType<CollectionUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateCollectionMutationOptions(options));
+    }
+
+export const getDeleteCollectionUrl = (id: number,) => {
+
+
+
+
+  return `/api/collections/${id}`
+}
+
+/**
+ * @summary Delete a collection without deleting its checklists
+ */
+export const deleteCollection = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteCollectionUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteCollectionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCollection>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCollection>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteCollection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCollection>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteCollection(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCollectionMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCollection>>>
+
+    export type DeleteCollectionMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a collection without deleting its checklists
+ */
+export const useDeleteCollection = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCollection>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCollection>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteCollectionMutationOptions(options));
+    }
+
+export const getCreateCollectionChecklistUrl = (id: number,) => {
+
+
+
+
+  return `/api/collections/${id}/checklists`
+}
+
+/**
+ * @summary Create a checklist inside a collection
+ */
+export const createCollectionChecklist = async (id: number,
+    checklistInput: ChecklistInput, options?: Parameters<typeof customFetch>[1]): Promise<Checklist> => {
+
+  return customFetch<Checklist>(getCreateCollectionChecklistUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(checklistInput)
+  }
+);}
+
+
+
+
+
+export const getCreateCollectionChecklistMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCollectionChecklist>>, TError,{id: number;data: BodyType<ChecklistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCollectionChecklist>>, TError,{id: number;data: BodyType<ChecklistInput>}, TContext> => {
+
+const mutationKey = ['createCollectionChecklist'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCollectionChecklist>>, {id: number;data: BodyType<ChecklistInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createCollectionChecklist(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCollectionChecklistMutationResult = NonNullable<Awaited<ReturnType<typeof createCollectionChecklist>>>
+    export type CreateCollectionChecklistMutationBody = BodyType<ChecklistInput>
+    export type CreateCollectionChecklistMutationError = ErrorType<void>
+
+    /**
+ * @summary Create a checklist inside a collection
+ */
+export const useCreateCollectionChecklist = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCollectionChecklist>>, TError,{id: number;data: BodyType<ChecklistInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCollectionChecklist>>,
+        TError,
+        {id: number;data: BodyType<ChecklistInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCollectionChecklistMutationOptions(options));
+    }
+
+export const getAddChecklistToCollectionUrl = (id: number,
+    checklistId: number,) => {
+
+
+
+
+  return `/api/collections/${id}/checklists/${checklistId}`
+}
+
+/**
+ * @summary Add an existing checklist to a collection
+ */
+export const addChecklistToCollection = async (id: number,
+    checklistId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getAddChecklistToCollectionUrl(id,checklistId),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+
+export const getAddChecklistToCollectionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addChecklistToCollection>>, TError,{id: number;checklistId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addChecklistToCollection>>, TError,{id: number;checklistId: number}, TContext> => {
+
+const mutationKey = ['addChecklistToCollection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addChecklistToCollection>>, {id: number;checklistId: number}> = (props) => {
+          const {id,checklistId} = props ?? {};
+
+          return  addChecklistToCollection(id,checklistId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddChecklistToCollectionMutationResult = NonNullable<Awaited<ReturnType<typeof addChecklistToCollection>>>
+
+    export type AddChecklistToCollectionMutationError = ErrorType<void>
+
+    /**
+ * @summary Add an existing checklist to a collection
+ */
+export const useAddChecklistToCollection = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addChecklistToCollection>>, TError,{id: number;checklistId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addChecklistToCollection>>,
+        TError,
+        {id: number;checklistId: number},
+        TContext
+      > => {
+      return useMutation(getAddChecklistToCollectionMutationOptions(options));
+    }
+
+export const getRemoveChecklistFromCollectionUrl = (id: number,
+    checklistId: number,) => {
+
+
+
+
+  return `/api/collections/${id}/checklists/${checklistId}`
+}
+
+/**
+ * @summary Remove a checklist from a collection without deleting it
+ */
+export const removeChecklistFromCollection = async (id: number,
+    checklistId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRemoveChecklistFromCollectionUrl(id,checklistId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveChecklistFromCollectionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeChecklistFromCollection>>, TError,{id: number;checklistId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeChecklistFromCollection>>, TError,{id: number;checklistId: number}, TContext> => {
+
+const mutationKey = ['removeChecklistFromCollection'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeChecklistFromCollection>>, {id: number;checklistId: number}> = (props) => {
+          const {id,checklistId} = props ?? {};
+
+          return  removeChecklistFromCollection(id,checklistId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveChecklistFromCollectionMutationResult = NonNullable<Awaited<ReturnType<typeof removeChecklistFromCollection>>>
+
+    export type RemoveChecklistFromCollectionMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a checklist from a collection without deleting it
+ */
+export const useRemoveChecklistFromCollection = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeChecklistFromCollection>>, TError,{id: number;checklistId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeChecklistFromCollection>>,
+        TError,
+        {id: number;checklistId: number},
+        TContext
+      > => {
+      return useMutation(getRemoveChecklistFromCollectionMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 
