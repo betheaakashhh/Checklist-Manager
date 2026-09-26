@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request } from "express";
 import { getAuth } from "@clerk/express";
 import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
-import { db, checklistItemsTable, checklistItemsTable as itemsTable, checklistsTable, collectionChecklistsTable, collectionsTable } from "@workspace/db";
+import { db, checklistItemsTable, checklistItemsTable as itemsTable, checklistRelationsTable, checklistsTable, collectionChecklistsTable, collectionsTable } from "@workspace/db";
 import {
   AddChecklistToCollectionParams,
   CreateCollectionBody,
@@ -73,6 +73,7 @@ async function getCollectionPayload(id: number, ownerId: string | null) {
     .where(checklistOwnerCondition(ownerId))
     .orderBy(desc(checklistsTable.updatedAt));
   const allItems = await db.select().from(itemsTable);
+  const allRelations = await db.select().from(checklistRelationsTable);
   const checklistById = new Map(allChecklists.map((checklist) => [checklist.id, checklist]));
   const itemBuckets = new Map<number, typeof allItems>();
   for (const item of allItems) {
@@ -80,12 +81,44 @@ async function getCollectionPayload(id: number, ownerId: string | null) {
     bucket.push(item);
     itemBuckets.set(item.checklistId, bucket);
   }
+  const validChecklistIds = new Set(allChecklists.map((checklist) => checklist.id));
+  const childRelationsByParent = new Map<number, typeof allRelations>();
+  for (const relation of allRelations) {
+    if (!validChecklistIds.has(relation.parentChecklistId) || !validChecklistIds.has(relation.childChecklistId)) continue;
+    const bucket = childRelationsByParent.get(relation.parentChecklistId) ?? [];
+    bucket.push(relation);
+    childRelationsByParent.set(relation.parentChecklistId, bucket);
+  }
+  const progressCache = new Map<number, number>();
+  const calculateProgress = (checklistId: number, visiting = new Set<number>()): number => {
+    const cached = progressCache.get(checklistId);
+    if (cached !== undefined) return cached;
+    const checklistItems = itemBuckets.get(checklistId) ?? [];
+    const childRelations = childRelationsByParent.get(checklistId) ?? [];
+    const completedItems = checklistItems.filter((item) => item.status === "done").length;
+    const units = checklistItems.length + childRelations.length;
+    if (!units) return 0;
+    if (visiting.has(checklistId)) {
+      return checklistItems.length ? Math.round((completedItems / checklistItems.length) * 100) : 0;
+    }
+    const nextVisiting = new Set(visiting);
+    nextVisiting.add(checklistId);
+    const childProgress = childRelations.reduce(
+      (total, relation) => total + calculateProgress(relation.childChecklistId, nextVisiting) / 100,
+      0,
+    );
+    const progress = Math.round(((completedItems + childProgress) / units) * 100);
+    progressCache.set(checklistId, progress);
+    return progress;
+  };
 
   const checklists = checklistIds.flatMap((checklistId) => {
     const checklist = checklistById.get(checklistId);
     if (!checklist) return [];
     const checklistItems = itemBuckets.get(checklistId) ?? [];
     const completedItems = checklistItems.filter((item) => item.status === "done").length;
+    const progress = calculateProgress(checklistId);
+    const childChecklistCount = childRelationsByParent.get(checklistId)?.length ?? 0;
     return [{
       id: checklist.id,
       title: checklist.title,
@@ -93,9 +126,9 @@ async function getCollectionPayload(id: number, ownerId: string | null) {
       updatedAt: checklist.updatedAt,
       totalItems: checklistItems.length,
       completedItems,
-      progress: checklistItems.length
-        ? Math.round((completedItems / checklistItems.length) * 100)
-        : 0,
+      progress,
+      isComplete: progress === 100,
+      childChecklistCount,
     }];
   });
   return { ...collection, checklists };

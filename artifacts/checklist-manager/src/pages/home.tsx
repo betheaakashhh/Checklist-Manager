@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useClerk, useUser } from '@clerk/react';
 import {
   Check,
+  CheckCircle2,
   ClipboardList,
   Clock3,
   FilePlus2,
@@ -10,11 +11,15 @@ import {
   FolderOpen,
   FolderPlus,
   ListChecks,
+  Link2,
   LoaderCircle,
+  MessageSquare,
   MoreHorizontal,
   Plus,
   Pencil,
   RefreshCw,
+  Search,
+  SlidersHorizontal,
   Trash2,
   TriangleAlert,
   Unlink,
@@ -23,6 +28,8 @@ import {
 import { useLocation } from 'wouter';
 import {
   useCreateChecklistItem,
+  useCreateChecklistRelation,
+  useDeleteChecklistRelation,
   getListCollectionsQueryKey,
   getGetChecklistQueryKey,
   getGetChecklistStatsQueryKey,
@@ -42,7 +49,14 @@ import {
   useUpdateChecklist,
   useUpdateChecklistItem,
 } from '@workspace/api-client-react';
-import type { Checklist, ChecklistActivity, ChecklistItem, ChecklistStatus, Collection } from '@workspace/api-client-react';
+import type {
+  Checklist,
+  ChecklistActivity,
+  ChecklistItem,
+  ChecklistRelationType,
+  ChecklistStatus,
+  Collection,
+} from '@workspace/api-client-react';
 
 const statuses: ChecklistStatus[] = ['todo', 'in_progress', 'done', 'blocked'];
 const statusLabels: Record<ChecklistStatus, string> = {
@@ -83,11 +97,13 @@ function patchChecklistItem(queryClient: ReturnType<typeof useQueryClient>, chec
       totalItems: items.length,
       completedItems,
       progress: items.length ? (completedItems / items.length) * 100 : 0,
+       isComplete: items.length > 0 && completedItems === items.length && old.childChecklistCount === 0,
     };
   });
   queryClient.invalidateQueries({ queryKey: getListChecklistsQueryKey() });
   queryClient.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
   queryClient.invalidateQueries({ queryKey: getGetChecklistStatsQueryKey() });
+  queryClient.invalidateQueries({ queryKey: getGetChecklistQueryKey(checklistId) });
 }
 
 function StatCard({ label, value, foot, primary = false }: { label: string; value: string | number; foot: string; primary?: boolean }) {
@@ -129,6 +145,8 @@ function StatusSelect({ item, checklistId, onError }: { item: ChecklistItem; che
 function ChecklistItemRow({ item, checklistId, onError }: { item: ChecklistItem; checklistId: number; onError: (message: string) => void }) {
   const queryClient = useQueryClient();
   const updateItem = useUpdateChecklistItem();
+  const [noteDraft, setNoteDraft] = useState(item.note ?? '');
+  useEffect(() => setNoteDraft(item.note ?? ''), [item.note]);
   const toggleDone = () => {
     onError('');
     const status: ChecklistStatus = item.status === 'done' ? 'todo' : 'done';
@@ -137,6 +155,13 @@ function ChecklistItemRow({ item, checklistId, onError }: { item: ChecklistItem;
         patchChecklistItem(queryClient, checklistId, nextItem);
       },
       onError: () => onError('Could not update that item. Try again.'),
+    });
+  };
+  const saveNote = () => {
+    if (noteDraft === (item.note ?? '')) return;
+    updateItem.mutate({ checklistId, itemId: item.id, data: { note: noteDraft } }, {
+      onSuccess: (nextItem) => patchChecklistItem(queryClient, checklistId, nextItem),
+      onError: () => onError('Could not save that message. Try again.'),
     });
   };
   return (
@@ -153,6 +178,16 @@ function ChecklistItemRow({ item, checklistId, onError }: { item: ChecklistItem;
       <div className="item-copy">
         <div className={`item-title${item.status === 'done' ? ' done' : ''}`} data-testid={`text-item-title-${item.id}`}>{item.title}</div>
         <div className={`item-sub item-status-${item.status}`}>{statusLabels[item.status]}</div>
+        <textarea
+          className="item-note"
+          value={noteDraft}
+          onChange={(event) => setNoteDraft(event.target.value)}
+          onBlur={saveNote}
+          placeholder="Add a message or caption…"
+          rows={1}
+          aria-label={`Message for ${item.title}`}
+          data-testid={`textarea-item-note-${item.id}`}
+        />
       </div>
       <StatusSelect item={item} checklistId={checklistId} onError={onError} />
     </div>
@@ -238,7 +273,7 @@ function ActivityFeed({ activity, isLoading, hasError }: { activity: ChecklistAc
 
 function Home() {
   const queryClient = useQueryClient();
-  const [activeSection, setActiveSection] = useState<'overview' | 'checklists' | 'activity'>('checklists');
+  const [activeSection, setActiveSection] = useState<'overview' | 'checklists' | 'completed' | 'collections' | 'activity'>('checklists');
   const [activeCollectionId, setActiveCollectionId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [sourceText, setSourceText] = useState('');
@@ -247,11 +282,19 @@ function Home() {
   const [mutationMessage, setMutationMessage] = useState('');
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [newItemTitle, setNewItemTitle] = useState('');
+  const [newItemNote, setNewItemNote] = useState('');
   const [addItemMessage, setAddItemMessage] = useState('');
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [collectionDialog, setCollectionDialog] = useState<'create' | 'rename' | 'delete' | 'attach' | null>(null);
   const [collectionNameDraft, setCollectionNameDraft] = useState('');
   const [collectionMessage, setCollectionMessage] = useState('');
+  const [collectionSearch, setCollectionSearch] = useState('');
+  const [collectionDateFilter, setCollectionDateFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
+  const [collectionSort, setCollectionSort] = useState<'newest' | 'oldest' | 'name'>('newest');
+  const [isRelationDialogOpen, setIsRelationDialogOpen] = useState(false);
+  const [relationChecklistId, setRelationChecklistId] = useState<number | null>(null);
+  const [relationType, setRelationType] = useState<ChecklistRelationType>('supports');
+  const [relationMessage, setRelationMessage] = useState('');
 
   const lists = useListChecklists();
   const collectionsQuery = useListCollections();
@@ -264,6 +307,8 @@ function Home() {
   const createChecklistItem = useCreateChecklistItem();
   const updateChecklist = useUpdateChecklist();
   const deleteChecklist = useDeleteChecklist();
+  const createChecklistRelation = useCreateChecklistRelation();
+  const deleteChecklistRelation = useDeleteChecklistRelation();
   const createCollection = useCreateCollection();
   const updateCollection = useUpdateCollection();
   const deleteCollection = useDeleteCollection();
@@ -274,10 +319,14 @@ function Home() {
   const summaries = lists.data ?? [];
   const collections = collectionsQuery.data ?? [];
   const activeCollection = collections.find((collection) => collection.id === activeCollectionId);
+  const completedSummaries = summaries.filter((summary) => summary.isComplete);
+  const activeSummaries = summaries.filter((summary) => !summary.isComplete);
   const visibleSummaries = activeCollection
-    ? activeCollection.checklists
+    ? activeCollection.checklists.filter((summary) => !summary.isComplete)
     : activeCollectionId === null
-      ? summaries
+      ? activeSection === 'completed'
+        ? completedSummaries
+        : activeSummaries
       : [];
   const activity = stats.data?.recentActivity ?? [];
   const completionRate = stats.data?.completionRate ?? 0;
@@ -296,6 +345,25 @@ function Home() {
     { key: 'blocked' as const, label: statusLabels.blocked, value: stats.data?.blockedItems ?? 0 },
   ], [stats.data?.blockedItems, stats.data?.completedItems, stats.data?.inProgressItems, stats.data?.todoItems]);
   const statusTotal = statusTotals.reduce((sum, item) => sum + item.value, 0);
+  const filteredCollections = useMemo(() => {
+    const query = collectionSearch.trim().toLowerCase();
+    const now = Date.now();
+    const filtered = collections.filter((collection) => {
+      const matchesSearch = !query || collection.name.toLowerCase().includes(query);
+      const age = now - new Date(collection.createdAt).getTime();
+      const matchesDate =
+        collectionDateFilter === 'all' ||
+        (collectionDateFilter === 'today' && age < 86400000) ||
+        (collectionDateFilter === '7d' && age < 7 * 86400000) ||
+        (collectionDateFilter === '30d' && age < 30 * 86400000);
+      return matchesSearch && matchesDate;
+    });
+    return filtered.sort((a, b) => {
+      if (collectionSort === 'name') return a.name.localeCompare(b.name);
+      const direction = collectionSort === 'newest' ? -1 : 1;
+      return direction * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    });
+  }, [collectionDateFilter, collectionSearch, collectionSort, collections]);
 
   useEffect(() => {
     if (selectedId === null && firstSummaryId !== null) {
@@ -303,6 +371,13 @@ function Home() {
       setTitleDraft(firstSummaryTitle);
     }
   }, [firstSummaryId, firstSummaryTitle, selectedId]);
+
+  useEffect(() => {
+    if (selected?.isComplete && activeSection === 'checklists') {
+      setActiveCollectionId(null);
+      setActiveSection('completed');
+    }
+  }, [activeSection, selected?.isComplete]);
 
   const invalidateCollections = () =>
     queryClient.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
@@ -336,6 +411,14 @@ function Home() {
     setMutationMessage('');
     const summary = summaries.find((item) => item.id === id);
     setTitleDraft(summary?.title ?? '');
+  };
+
+  const openChecklistSection = (section: 'checklists' | 'completed') => {
+    setActiveSection(section);
+    setActiveCollectionId(null);
+    const next = section === 'completed' ? completedSummaries[0] : activeSummaries[0];
+    setSelectedId(next?.id ?? null);
+    setTitleDraft(next?.title ?? '');
   };
 
   const handleSaveTitle = () => {
@@ -379,7 +462,7 @@ function Home() {
     event.preventDefault();
     if (!selected || !newItemTitle.trim()) return;
     setAddItemMessage('');
-    createChecklistItem.mutate({ id: selected.id, data: { title: newItemTitle.trim() } }, {
+    createChecklistItem.mutate({ id: selected.id, data: { title: newItemTitle.trim(), ...(newItemNote.trim() ? { note: newItemNote.trim() } : {}) } }, {
       onSuccess: (createdItem) => {
         queryClient.setQueryData<Checklist | undefined>(getGetChecklistQueryKey(selected.id), (old) => {
           if (!old) return old;
@@ -397,6 +480,7 @@ function Home() {
         queryClient.invalidateQueries({ queryKey: getListCollectionsQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetChecklistStatsQueryKey() });
         setNewItemTitle('');
+        setNewItemNote('');
         setAddItemMessage('');
         setIsAddItemOpen(false);
       },
@@ -420,8 +504,8 @@ function Home() {
       createCollection.mutate({ data: { name } }, {
         onSuccess: (created) => {
           void invalidateCollections();
-          setActiveCollectionId(created.id);
-          setActiveSection('checklists');
+          setActiveCollectionId(null);
+          setActiveSection('collections');
           setSelectedId(null);
           setCollectionDialog(null);
           setCollectionNameDraft('');
@@ -482,19 +566,57 @@ function Home() {
     );
   };
 
+  const openRelationDialog = () => {
+    setRelationChecklistId(null);
+    setRelationType('supports');
+    setRelationMessage('');
+    setIsRelationDialogOpen(true);
+  };
+
+  const handleCreateRelation = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selected || relationChecklistId === null) return;
+    setRelationMessage('');
+    createChecklistRelation.mutate({
+      id: selected.id,
+      data: { childChecklistId: relationChecklistId, relationType },
+    }, {
+      onSuccess: () => {
+        setIsRelationDialogOpen(false);
+        queryClient.invalidateQueries({ queryKey: getGetChecklistQueryKey(selected.id) });
+        queryClient.invalidateQueries({ queryKey: getListChecklistsQueryKey() });
+      },
+      onError: () => setRelationMessage('That checklist could not be connected. Avoid circular connections and try again.'),
+    });
+  };
+
+  const handleDeleteRelation = (relationId: number) => {
+    if (!selected) return;
+    deleteChecklistRelation.mutate({ id: selected.id, relationId }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetChecklistQueryKey(selected.id) });
+        queryClient.invalidateQueries({ queryKey: getListChecklistsQueryKey() });
+      },
+      onError: () => setMutationMessage('Could not remove that connection. Try again.'),
+    });
+  };
+
   const selectCollection = (collection: Collection) => {
     setActiveSection('checklists');
     setActiveCollectionId(collection.id);
-    setSelectedId(collection.checklists[0]?.id ?? null);
-    setTitleDraft(collection.checklists[0]?.title ?? '');
+    const next = collection.checklists.find((summary) => !summary.isComplete);
+    setSelectedId(next?.id ?? null);
+    setTitleDraft(next?.title ?? '');
     setMutationMessage('');
   };
 
   const sectionCopy = {
     overview: { eyebrow: 'Monday planning desk', title: 'Make a dent.', subtitle: 'A clear read on the work that matters today.' },
+    collections: { eyebrow: 'Folder library', title: 'Find the right space.', subtitle: 'Browse, search, and sort your checklist folders without crowding the sidebar.' },
     checklists: activeCollection
       ? { eyebrow: 'Collection', title: activeCollection.name, subtitle: `${activeCollection.checklists.length} ${activeCollection.checklists.length === 1 ? 'checklist' : 'checklists'} grouped in this folder.` }
       : { eyebrow: 'Work queue', title: 'Get to clear.', subtitle: 'Paste the rough version, then move each item forward.' },
+    completed: { eyebrow: 'Completed work', title: 'Keep the wins visible.', subtitle: 'Finished checklists move here automatically, while their history stays available.' },
     activity: { eyebrow: 'Workspace pulse', title: 'Keep the motion visible.', subtitle: 'A quick record of what changed across your queues.' },
   }[activeSection];
 
@@ -508,38 +630,11 @@ function Home() {
         <div className="sidebar-kicker">Workspace</div>
         <nav className="side-nav" aria-label="Main navigation">
           <button className={`side-nav-item${activeSection === 'overview' ? ' active' : ''}`} onClick={() => setActiveSection('overview')} aria-current={activeSection === 'overview' ? 'page' : undefined} data-testid="button-nav-overview"><ListChecks size={16} /><span>Overview</span></button>
-          <button className={`side-nav-item${activeSection === 'checklists' ? ' active' : ''}`} onClick={() => { setActiveSection('checklists'); setActiveCollectionId(null); }} aria-current={activeSection === 'checklists' ? 'page' : undefined} data-testid="button-nav-checklists"><ClipboardList size={16} /><span>Checklists</span></button>
+          <button className={`side-nav-item${activeSection === 'checklists' && activeCollectionId === null ? ' active' : ''}`} onClick={() => openChecklistSection('checklists')} aria-current={activeSection === 'checklists' && activeCollectionId === null ? 'page' : undefined} data-testid="button-nav-checklists"><ClipboardList size={16} /><span>Checklists</span></button>
+          <button className={`side-nav-item${activeSection === 'completed' ? ' active' : ''}`} onClick={() => openChecklistSection('completed')} aria-current={activeSection === 'completed' ? 'page' : undefined} data-testid="button-nav-completed"><CheckCircle2 size={16} /><span>Completed</span><small className="side-nav-count">{completedSummaries.length}</small></button>
+          <button className={`side-nav-item${activeSection === 'collections' ? ' active' : ''}`} onClick={() => { setActiveSection('collections'); setActiveCollectionId(null); setSelectedId(null); }} aria-current={activeSection === 'collections' ? 'page' : undefined} data-testid="button-nav-collections"><Folder size={16} /><span>Collections</span><small className="side-nav-count">{collections.length}</small></button>
           <button className={`side-nav-item${activeSection === 'activity' ? ' active' : ''}`} onClick={() => setActiveSection('activity')} aria-current={activeSection === 'activity' ? 'page' : undefined} data-testid="button-nav-recent"><Clock3 size={16} /><span>Recent activity</span></button>
         </nav>
-        <div className="collection-nav" aria-label="Checklist collections">
-          <div className="collection-nav-header">
-            <span>Collections</span>
-            <button className="collection-add-button" onClick={() => openCollectionDialog('create')} aria-label="Create collection" title="Create collection" data-testid="button-create-collection"><FolderPlus size={14} /></button>
-          </div>
-          {collectionsQuery.isLoading ? (
-            <div className="collection-nav-loading" aria-label="Loading collections"><span /><span /></div>
-          ) : collectionsQuery.error ? (
-            <button className="collection-retry" onClick={() => collectionsQuery.refetch()} data-testid="button-retry-collections"><RefreshCw size={12} /> Retry folders</button>
-          ) : collections.length === 0 ? (
-            <div className="collection-nav-empty">Make a folder for related checklists.</div>
-          ) : (
-            <div className="collection-nav-list">
-              {collections.map((collection) => (
-                <button
-                  key={collection.id}
-                  className={`collection-nav-item${activeCollectionId === collection.id && activeSection === 'checklists' ? ' active' : ''}`}
-                  onClick={() => selectCollection(collection)}
-                  title={collection.name}
-                  data-testid={`button-open-collection-${collection.id}`}
-                >
-                  {activeCollectionId === collection.id && activeSection === 'checklists' ? <FolderOpen size={15} /> : <Folder size={15} />}
-                  <span>{collection.name}</span>
-                  <small>{collection.checklists.length}</small>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
         <div className="sidebar-note">
           <strong>Small steps, visible.</strong>
           Turn the noisy list into the next clear move.
@@ -626,11 +721,104 @@ function Home() {
               )}
             </div>
           </section>
+          <section className="surface relationship-timeline" aria-label="Connected checklist progress" data-testid="panel-relationship-timeline">
+            <div className="surface-header">
+              <div>
+                <h2 className="section-title">Connected work timeline</h2>
+                <p className="insight-caption">Master checklists move as their linked queues move.</p>
+              </div>
+              <span className="section-meta">{summaries.filter((summary) => (summary.childChecklistCount ?? 0) > 0).length} masters</span>
+            </div>
+            {summaries.filter((summary) => (summary.childChecklistCount ?? 0) > 0).length === 0 ? (
+              <div className="timeline-empty"><Link2 size={18} /><span>Connect supporting checklists to see their combined progress here.</span></div>
+            ) : (
+              <div className="timeline-list">
+                {summaries.filter((summary) => (summary.childChecklistCount ?? 0) > 0).slice(0, 5).map((summary) => (
+                  <button className="timeline-row" key={summary.id} onClick={() => { setActiveSection('checklists'); setActiveCollectionId(null); handleSelect(summary.id); }} data-testid={`button-timeline-checklist-${summary.id}`}>
+                    <span className="timeline-node"><span /></span>
+                    <span className="timeline-copy"><strong>{summary.title}</strong><small>{summary.childChecklistCount} linked {summary.childChecklistCount === 1 ? 'checklist' : 'checklists'} · {summary.isComplete ? 'complete' : 'in progress'}</small></span>
+                    <span className="timeline-progress"><span className="timeline-track"><span style={{ width: `${summary.progress}%` }} /></span><strong>{Math.round(summary.progress)}%</strong></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
           </section>}
 
-          {activeSection === 'checklists' && <div className="workspace-grid checklist-page" id="checklists-page">
+          {activeSection === 'collections' && <section className="collections-page" aria-label="Checklist collections">
+            <div className="collections-toolbar">
+              <div className="collections-toolbar-copy">
+                <span className="section-meta">Folder library</span>
+                <strong>{collections.length} {collections.length === 1 ? 'collection' : 'collections'}</strong>
+              </div>
+              <button className="primary-button" onClick={() => openCollectionDialog('create')} data-testid="button-create-collection"><FolderPlus size={14} /> New collection</button>
+            </div>
+            <div className="collections-filters surface">
+              <div className="collection-search">
+                <Search size={15} />
+                <input
+                  className="collection-search-input"
+                  value={collectionSearch}
+                  onChange={(event) => setCollectionSearch(event.target.value)}
+                  placeholder="Search collections by name…"
+                  aria-label="Search collections"
+                  data-testid="input-search-collections"
+                />
+              </div>
+              <label className="collection-filter">
+                <SlidersHorizontal size={14} />
+                <span className="sr-only">Filter collections by date</span>
+                <select value={collectionDateFilter} onChange={(event) => setCollectionDateFilter(event.target.value as typeof collectionDateFilter)} aria-label="Filter collections by date" data-testid="select-collection-date">
+                  <option value="all">Any date</option>
+                  <option value="today">Created today</option>
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                </select>
+              </label>
+              <label className="collection-filter">
+                <span className="sr-only">Sort collections</span>
+                <select value={collectionSort} onChange={(event) => setCollectionSort(event.target.value as typeof collectionSort)} aria-label="Sort collections" data-testid="select-collection-sort">
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="name">Name A–Z</option>
+                </select>
+              </label>
+            </div>
+            {collectionsQuery.isLoading ? (
+              <div className="collection-card-grid"><div className="surface collection-card-skeleton" /><div className="surface collection-card-skeleton" /><div className="surface collection-card-skeleton" /></div>
+            ) : collectionsQuery.error ? (
+              <div className="empty-state surface"><TriangleAlert size={24} /><strong>Couldn’t load your collections</strong><p>Refresh the workspace and we’ll try again.</p><button className="quiet-button" style={{ marginTop: 14 }} onClick={() => collectionsQuery.refetch()} data-testid="button-retry-collections"><RefreshCw size={13} /> Retry</button></div>
+            ) : filteredCollections.length === 0 ? (
+              <div className="empty-state surface" data-testid="status-collections-empty"><FolderOpen size={26} /><strong>{collections.length ? 'No folders match those filters.' : 'Create your first collection.'}</strong><p>{collections.length ? 'Try another name, date range, or sort option.' : 'Keep related checklists together in a folder that is easy to find.'}</p>{!collections.length && <button className="primary-button" style={{ marginTop: 14 }} onClick={() => openCollectionDialog('create')}><FolderPlus size={14} /> Create collection</button>}</div>
+            ) : (
+              <div className="collection-card-grid">
+                {filteredCollections.map((collection) => {
+                  const completeCount = collection.checklists.filter((item) => item.isComplete).length;
+                  return (
+                    <button key={collection.id} className="surface collection-card" onClick={() => selectCollection(collection)} data-testid={`button-open-collection-${collection.id}`}>
+                      <span className="collection-card-icon"><Folder size={20} /></span>
+                      <span className="collection-card-content">
+                        <strong>{collection.name}</strong>
+                        <small>{collection.checklists.length} {collection.checklists.length === 1 ? 'checklist' : 'checklists'} · {completeCount} complete</small>
+                        <span className="collection-card-date">Created {new Date(collection.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      </span>
+                      <span className="collection-card-arrow">→</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>}
+
+          {(activeSection === 'checklists' || activeSection === 'completed') && <div className="workspace-grid checklist-page" id="checklists-page">
             <section>
-              {activeCollection && (
+              {activeSection === 'completed' && (
+                <div className="completed-banner">
+                  <div className="collection-banner-mark"><CheckCircle2 size={19} /></div>
+                  <div className="collection-banner-copy"><span className="collection-banner-label">Completed section</span><strong>Finished checklists</strong><small>{completedSummaries.length} {completedSummaries.length === 1 ? 'checklist' : 'checklists'} closed out</small></div>
+                </div>
+              )}
+              {activeCollection && activeSection === 'checklists' && (
                 <div className="collection-banner" data-testid={`panel-collection-${activeCollection.id}`}>
                   <div className="collection-banner-mark"><FolderOpen size={19} /></div>
                   <div className="collection-banner-copy">
@@ -645,7 +833,7 @@ function Home() {
                   </div>
                 </div>
               )}
-              <div className="paste-panel">
+              {activeSection === 'checklists' && <div className="paste-panel">
                 <div className="paste-heading">
                   <div className="paste-icon"><Zap size={15} /></div>
                   <div className="paste-copy">
@@ -669,12 +857,12 @@ function Home() {
                     </button>
                   </div>
                 </form>
-              </div>
+              </div>}
 
               <div className="surface list-panel">
                 <div className="surface-header">
-                  <h2 className="section-title">{activeCollection ? `Checklists in ${activeCollection.name}` : 'Your checklists'}</h2>
-                  <span className="section-meta" data-testid="text-checklist-count">{activeCollection ? `${visibleSummaries.length} ${visibleSummaries.length === 1 ? 'list' : 'lists'}` : listCountLabel}</span>
+                  <h2 className="section-title">{activeCollection ? `Checklists in ${activeCollection.name}` : activeSection === 'completed' ? 'Completed checklists' : 'Your checklists'}</h2>
+                  <span className="section-meta" data-testid="text-checklist-count">{activeCollection ? `${visibleSummaries.length} ${visibleSummaries.length === 1 ? 'list' : 'lists'}` : activeSection === 'completed' ? `${completedSummaries.length} complete` : `${activeSummaries.length} active`}</span>
                 </div>
                 {lists.isLoading ? (
                   <div className="skeleton-list" data-testid="status-checklists-loading">
@@ -685,8 +873,8 @@ function Home() {
                 ) : visibleSummaries.length === 0 ? (
                   <div className="empty-state" data-testid="status-checklists-empty">
                     {activeCollection ? <FolderOpen size={24} /> : <ClipboardList size={24} />}
-                    <strong>{activeCollection ? 'This folder is ready for its first checklist.' : 'Your next clear win starts here.'}</strong>
-                    <p>{activeCollection ? 'Create a new checklist above or add one you already have.' : 'Paste a rough list above and it will appear in this space.'}</p>
+                    <strong>{activeSection === 'completed' ? 'No checklists are complete yet.' : activeCollection ? 'This folder is ready for its first checklist.' : 'Your next clear win starts here.'}</strong>
+                    <p>{activeSection === 'completed' ? 'Finish every item in a checklist and it will move here automatically.' : activeCollection ? 'Create a new checklist above or add one you already have.' : 'Paste a rough list above and it will appear in this space.'}</p>
                   </div>
                 ) : (
                   <div className="list-body">
@@ -723,13 +911,39 @@ function Home() {
                       </div>
                       <div className="detail-actions">
                         <button className="danger-button" onClick={handleDelete} disabled={deleteChecklist.isPending} data-testid="button-delete-checklist"><Trash2 size={13} /> <span className="sr-only">Delete list</span></button>
-                        <button className="quiet-button" onClick={() => { setNewItemTitle(''); setAddItemMessage(''); setIsAddItemOpen(true); }} disabled={!selected} data-testid="button-add-checklist-item"><Plus size={13} /> <span className="sr-only">Add item</span></button>
+                        <button className="quiet-button" onClick={() => { setNewItemTitle(''); setNewItemNote(''); setAddItemMessage(''); setIsAddItemOpen(true); }} disabled={!selected} data-testid="button-add-checklist-item"><Plus size={13} /> <span className="sr-only">Add item</span></button>
                         <button className="quiet-button" onClick={() => selectedQuery.refetch()} data-testid="button-refresh-checklist"><RefreshCw size={13} /></button>
                       </div>
                     </div>
                     <div className="progress-cluster">
-                      <div className="progress-line"><span><strong>{selected.completedItems}</strong> of {selected.totalItems} items complete</span><span className="progress-number">{Math.round(selected.progress)}%</span></div>
+                      <div className="progress-line"><span><strong>{selected.completedItems}</strong> of {selected.totalItems} items complete{(selected.childChecklistCount ?? 0) > 0 ? ` · ${selected.childChecklistCount} linked` : ''}</span><span className="progress-number">{Math.round(selected.progress)}%</span></div>
                       <div className="progress-track"><div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, selected.progress))}%` }} /></div>
+                    </div>
+                    <div className="relations-panel" data-testid="panel-checklist-relations">
+                      <div className="relations-header">
+                        <div>
+                          <h3><Link2 size={14} /> Connected checklists</h3>
+                          <p>{selected.childChecklistCount ? 'This checklist stays open until its connected work is complete.' : 'Connect supporting queues to make this a master checklist.'}</p>
+                        </div>
+                        <button className="quiet-button relation-connect-button" onClick={openRelationDialog} data-testid="button-connect-checklist"><Link2 size={13} /> Connect</button>
+                      </div>
+                      {selected.relatedChecklists.length === 0 ? (
+                        <div className="relations-empty">No child checklists connected yet.</div>
+                      ) : (
+                        <div className="relation-list">
+                          {selected.relatedChecklists.map((relation) => (
+                            <div className="relation-row" key={relation.id}>
+                              <div className="relation-row-icon"><Link2 size={13} /></div>
+                              <div className="relation-row-copy">
+                                <strong>{relation.checklist.title}</strong>
+                                <small>{relation.relationType.replace('_', ' ')} · {relation.checklist.isComplete ? 'complete' : `${Math.round(relation.checklist.progress)}% in progress`}</small>
+                                <span className="relation-progress-track"><span style={{ width: `${relation.checklist.progress}%` }} /></span>
+                              </div>
+                              <button className="relation-remove" onClick={() => handleDeleteRelation(relation.id)} disabled={deleteChecklistRelation.isPending} aria-label={`Disconnect ${relation.checklist.title}`} title="Disconnect checklist" data-testid={`button-disconnect-checklist-${relation.id}`}><Unlink size={13} /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="items-header"><h3>Work queue</h3><span className="section-meta">{hasItems ? `${selected.items.length} items` : 'clear'}</span></div>
                     {mutationMessage && <div className="inline-message" style={{ padding: '0 21px 9px' }} data-testid="status-mutation-message">{mutationMessage}</div>}
@@ -765,6 +979,16 @@ function Home() {
               autoFocus
               data-testid="input-new-checklist-item"
             />
+            <label className="field-label" htmlFor="new-item-note">Message or caption <span style={{ opacity: .55 }}>(optional)</span></label>
+            <textarea
+              id="new-item-note"
+              className="text-area item-note-modal"
+              value={newItemNote}
+              onChange={(event) => setNewItemNote(event.target.value)}
+              placeholder="Add context, a reminder, or a short caption…"
+              rows={3}
+              data-testid="textarea-new-checklist-item-note"
+            />
             {addItemMessage && <div className="error-message" data-testid="status-add-item-error">{addItemMessage}</div>}
             <div className="modal-actions">
               <button type="button" className="quiet-button" onClick={() => setIsAddItemOpen(false)} disabled={createChecklistItem.isPending}>Cancel</button>
@@ -787,6 +1011,42 @@ function Home() {
               {deleteChecklist.isPending ? <><LoaderCircle size={13} className="animate-spin" /> Deleting…</> : <><Trash2 size={13} /> Delete checklist</>}
             </button>
           </div>
+        </Modal>
+      )}
+      {isRelationDialogOpen && selected && (
+        <Modal
+          title="Connect a checklist"
+          description={`Add related work beneath “${selected.title}”. Its progress will be part of the master checklist.`}
+          onClose={() => { if (!createChecklistRelation.isPending) setIsRelationDialogOpen(false); }}
+        >
+          <form className="modal-form" onSubmit={handleCreateRelation}>
+            <label className="field-label" htmlFor="relation-checklist">Child checklist</label>
+            <select
+              id="relation-checklist"
+              className="text-input"
+              value={relationChecklistId ?? ''}
+              onChange={(event) => setRelationChecklistId(event.target.value ? Number(event.target.value) : null)}
+              data-testid="select-relation-checklist"
+            >
+              <option value="">Choose a checklist…</option>
+              {summaries
+                .filter((summary) => summary.id !== selected.id && !selected.relatedChecklists.some((relation) => relation.childChecklistId === summary.id))
+                .map((summary) => <option key={summary.id} value={summary.id}>{summary.title}</option>)}
+            </select>
+            <label className="field-label" htmlFor="relation-type">Connection type</label>
+            <select id="relation-type" className="text-input" value={relationType} onChange={(event) => setRelationType(event.target.value as ChecklistRelationType)} data-testid="select-relation-type">
+              <option value="supports">Supports</option>
+              <option value="queue">Queue</option>
+              <option value="belongs_to">Belongs to</option>
+            </select>
+            {relationMessage && <div className="error-message" data-testid="status-relation-message">{relationMessage}</div>}
+            <div className="modal-actions">
+              <button type="button" className="quiet-button" onClick={() => setIsRelationDialogOpen(false)}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={relationChecklistId === null || createChecklistRelation.isPending} data-testid="button-submit-relation">
+                {createChecklistRelation.isPending ? <><LoaderCircle size={13} className="animate-spin" /> Connecting…</> : <><Link2 size={13} /> Connect checklist</>}
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
       {collectionDialog && (

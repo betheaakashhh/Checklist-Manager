@@ -18,10 +18,32 @@ export const checklistItemsTable = pgTable("checklist_items", {
     .references(() => checklistsTable.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   title: text("title").notNull(),
+  note: text("note").notNull().default(""),
   status: text("status").notNull().default("todo"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const checklistRelationsTable = pgTable(
+  "checklist_relations",
+  {
+    id: serial("id").primaryKey(),
+    parentChecklistId: integer("parent_checklist_id")
+      .notNull()
+      .references(() => checklistsTable.id, { onDelete: "cascade" }),
+    childChecklistId: integer("child_checklist_id")
+      .notNull()
+      .references(() => checklistsTable.id, { onDelete: "cascade" }),
+    relationType: text("relation_type").notNull().default("supports"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("checklist_relations_parent_child_unique").on(
+      table.parentChecklistId,
+      table.childChecklistId,
+    ),
+  ],
+);
 
 export const collectionsTable = pgTable("collections", {
   id: serial("id").primaryKey(),
@@ -65,5 +87,6 @@ export const insertChecklistItemSchema = createInsertSchema(checklistItemsTable)
 
 export type Checklist = typeof checklistsTable.$inferSelect;
 export type ChecklistItem = typeof checklistItemsTable.$inferSelect;
+export type ChecklistRelation = typeof checklistRelationsTable.$inferSelect;
 export type InsertChecklist = z.infer<typeof insertChecklistSchema>;
 export type InsertChecklistItem = z.infer<typeof insertChecklistItemSchema>;

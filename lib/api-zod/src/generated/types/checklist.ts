@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ChecklistItem } from './checklistItem';
+import type { ChecklistRelation } from './checklistRelation';
 
 export interface Checklist {
   id: number;
@@ -16,5 +17,8 @@ export interface Checklist {
   totalItems: number;
   completedItems: number;
   progress: number;
+  isComplete: boolean;
+  childChecklistCount?: number;
   items: ChecklistItem[];
+  relatedChecklists: ChecklistRelation[];
 }

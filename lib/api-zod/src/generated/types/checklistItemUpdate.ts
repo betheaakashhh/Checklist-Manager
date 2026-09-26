@@ -11,4 +11,5 @@ export interface ChecklistItemUpdate {
   /** @minLength 1 */
   title?: string;
   status?: ChecklistStatus;
+  note?: string;
 }

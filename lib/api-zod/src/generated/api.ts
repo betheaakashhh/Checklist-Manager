@@ -23,7 +23,9 @@ export const ListCollectionsResponseItem = zod.object({
   "updatedAt": zod.coerce.date(),
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
-  "progress": zod.number().int()
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
 }))
 })
 export const ListCollectionsResponse = zod.array(ListCollectionsResponseItem)
@@ -51,7 +53,9 @@ export const CreateCollectionResponse = zod.object({
   "updatedAt": zod.coerce.date(),
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
-  "progress": zod.number().int()
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
 }))
 })
 
@@ -85,7 +89,9 @@ export const UpdateCollectionResponse = zod.object({
   "updatedAt": zod.coerce.date(),
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
-  "progress": zod.number().int()
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
 }))
 })
 
@@ -130,14 +136,35 @@ export const CreateCollectionChecklistResponse = zod.object({
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
   "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int().optional(),
   "items": zod.array(zod.object({
   "id": zod.number().int(),
   "checklistId": zod.number().int(),
   "position": zod.number().int(),
   "title": zod.string(),
+  "note": zod.string(),
   "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})),
+  "relatedChecklists": zod.array(zod.object({
+  "id": zod.number().int(),
+  "parentChecklistId": zod.number().int(),
+  "childChecklistId": zod.number().int(),
+  "relationType": zod.enum(['supports', 'queue', 'belongs_to']),
+  "createdAt": zod.coerce.date(),
+  "checklist": zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
+})
 }))
 })
 
@@ -191,7 +218,9 @@ export const ListChecklistsResponseItem = zod.object({
   "updatedAt": zod.coerce.date(),
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
-  "progress": zod.number().int()
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
 })
 export const ListChecklistsResponse = zod.array(ListChecklistsResponseItem)
 
@@ -216,14 +245,35 @@ export const CreateChecklistResponse = zod.object({
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
   "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int().optional(),
   "items": zod.array(zod.object({
   "id": zod.number().int(),
   "checklistId": zod.number().int(),
   "position": zod.number().int(),
   "title": zod.string(),
+  "note": zod.string(),
   "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})),
+  "relatedChecklists": zod.array(zod.object({
+  "id": zod.number().int(),
+  "parentChecklistId": zod.number().int(),
+  "childChecklistId": zod.number().int(),
+  "relationType": zod.enum(['supports', 'queue', 'belongs_to']),
+  "createdAt": zod.coerce.date(),
+  "checklist": zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
+})
 }))
 })
 
@@ -268,14 +318,35 @@ export const GetChecklistResponse = zod.object({
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
   "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int().optional(),
   "items": zod.array(zod.object({
   "id": zod.number().int(),
   "checklistId": zod.number().int(),
   "position": zod.number().int(),
   "title": zod.string(),
+  "note": zod.string(),
   "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})),
+  "relatedChecklists": zod.array(zod.object({
+  "id": zod.number().int(),
+  "parentChecklistId": zod.number().int(),
+  "childChecklistId": zod.number().int(),
+  "relationType": zod.enum(['supports', 'queue', 'belongs_to']),
+  "createdAt": zod.coerce.date(),
+  "checklist": zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
+})
 }))
 })
 
@@ -306,14 +377,35 @@ export const UpdateChecklistResponse = zod.object({
   "totalItems": zod.number().int(),
   "completedItems": zod.number().int(),
   "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int().optional(),
   "items": zod.array(zod.object({
   "id": zod.number().int(),
   "checklistId": zod.number().int(),
   "position": zod.number().int(),
   "title": zod.string(),
+  "note": zod.string(),
   "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})),
+  "relatedChecklists": zod.array(zod.object({
+  "id": zod.number().int(),
+  "parentChecklistId": zod.number().int(),
+  "childChecklistId": zod.number().int(),
+  "relationType": zod.enum(['supports', 'queue', 'belongs_to']),
+  "createdAt": zod.coerce.date(),
+  "checklist": zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
+})
 }))
 })
 
@@ -348,7 +440,8 @@ export const UpdateChecklistItemParams = zod.object({
 
 export const UpdateChecklistItemBody = zod.object({
   "title": zod.string().min(1).optional(),
-  "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']).optional()
+  "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']).optional(),
+  "note": zod.string().optional()
 })
 
 export const UpdateChecklistItemResponse = zod.object({
@@ -356,10 +449,95 @@ export const UpdateChecklistItemResponse = zod.object({
   "checklistId": zod.number().int(),
   "position": zod.number().int(),
   "title": zod.string(),
+  "note": zod.string(),
   "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * @summary List checklists connected beneath a parent checklist
+ */
+
+
+
+export const ListChecklistRelationsParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+export const ListChecklistRelationsResponseItem = zod.object({
+  "id": zod.number().int(),
+  "parentChecklistId": zod.number().int(),
+  "childChecklistId": zod.number().int(),
+  "relationType": zod.enum(['supports', 'queue', 'belongs_to']),
+  "createdAt": zod.coerce.date(),
+  "checklist": zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
+})
+})
+export const ListChecklistRelationsResponse = zod.array(ListChecklistRelationsResponseItem)
+
+
+/**
+ * @summary Connect a child checklist to a parent checklist
+ */
+
+
+
+export const CreateChecklistRelationParams = zod.object({
+  "id": zod.coerce.number().int().min(1)
+})
+
+
+
+
+export const CreateChecklistRelationBody = zod.object({
+  "childChecklistId": zod.number().int().min(1),
+  "relationType": zod.enum(['supports', 'queue', 'belongs_to']).optional()
+})
+
+export const CreateChecklistRelationResponse = zod.object({
+  "id": zod.number().int(),
+  "parentChecklistId": zod.number().int(),
+  "childChecklistId": zod.number().int(),
+  "relationType": zod.enum(['supports', 'queue', 'belongs_to']),
+  "createdAt": zod.coerce.date(),
+  "checklist": zod.object({
+  "id": zod.number().int(),
+  "title": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "totalItems": zod.number().int(),
+  "completedItems": zod.number().int(),
+  "progress": zod.number().int(),
+  "isComplete": zod.boolean(),
+  "childChecklistCount": zod.number().int()
+})
+})
+
+
+/**
+ * @summary Remove a child checklist connection
+ */
+
+
+
+
+export const DeleteChecklistRelationParams = zod.object({
+  "id": zod.coerce.number().int().min(1),
+  "relationId": zod.coerce.number().int().min(1)
+})
+
+export const DeleteChecklistRelationResponse = zod.void()
 
 
 /**
@@ -376,7 +554,8 @@ export const CreateChecklistItemParams = zod.object({
 
 
 export const CreateChecklistItemBody = zod.object({
-  "title": zod.string().min(1)
+  "title": zod.string().min(1),
+  "note": zod.string().optional()
 })
 
 export const CreateChecklistItemResponse = zod.object({
@@ -384,6 +563,7 @@ export const CreateChecklistItemResponse = zod.object({
   "checklistId": zod.number().int(),
   "position": zod.number().int(),
   "title": zod.string(),
+  "note": zod.string(),
   "status": zod.enum(['todo', 'in_progress', 'done', 'blocked']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()

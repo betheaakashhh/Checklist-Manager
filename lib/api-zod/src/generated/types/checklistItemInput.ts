@@ -9,4 +9,5 @@
 export interface ChecklistItemInput {
   /** @minLength 1 */
   title: string;
+  note?: string;
 }

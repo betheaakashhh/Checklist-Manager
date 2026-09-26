@@ -14,4 +14,6 @@ export interface ChecklistSummary {
   totalItems: number;
   completedItems: number;
   progress: number;
+  isComplete: boolean;
+  childChecklistCount: number;
 }

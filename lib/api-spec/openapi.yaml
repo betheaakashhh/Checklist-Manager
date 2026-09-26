@@ -269,6 +269,60 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /checklists/{id}/relations:
+    get:
+      operationId: listChecklistRelations
+      tags: [checklists]
+      summary: List checklists connected beneath a parent checklist
+      parameters:
+        - $ref: "#/components/parameters/ChecklistId"
+      responses:
+        "200":
+          description: Connected child checklists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChecklistRelation"
+        "404":
+          description: Parent checklist not found
+    post:
+      operationId: createChecklistRelation
+      tags: [checklists]
+      summary: Connect a child checklist to a parent checklist
+      parameters:
+        - $ref: "#/components/parameters/ChecklistId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistRelationInput"
+      responses:
+        "201":
+          description: Connected checklist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistRelation"
+        "400":
+          description: Invalid or circular connection
+        "404":
+          description: Parent or child checklist not found
+  /checklists/{id}/relations/{relationId}:
+    delete:
+      operationId: deleteChecklistRelation
+      tags: [checklists]
+      summary: Remove a child checklist connection
+      parameters:
+        - $ref: "#/components/parameters/ChecklistId"
+        - $ref: "#/components/parameters/RelationId"
+      responses:
+        "204":
+          description: Connection removed
+        "404":
+          description: Connection not found
   /checklists/{id}/items:
     post:
       operationId: createChecklistItem
@@ -332,6 +386,13 @@ components:
       schema:
         type: integer
         minimum: 1
+    RelationId:
+      name: relationId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
   schemas:
     HealthStatus:
       type: object
@@ -360,6 +421,8 @@ components:
           type: integer
         title:
           type: string
+        note:
+          type: string
         status:
           $ref: "#/components/schemas/ChecklistStatus"
         createdAt:
@@ -368,7 +431,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, checklistId, position, title, status, createdAt, updatedAt]
+      required: [id, checklistId, position, title, note, status, createdAt, updatedAt]
     Checklist:
       type: object
       properties:
@@ -390,11 +453,19 @@ components:
           type: integer
         progress:
           type: integer
+        isComplete:
+          type: boolean
+        childChecklistCount:
+          type: integer
         items:
           type: array
           items:
             $ref: "#/components/schemas/ChecklistItem"
-      required: [id, title, sourceText, createdAt, updatedAt, totalItems, completedItems, progress, items]
+        relatedChecklists:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChecklistRelation"
+      required: [id, title, sourceText, createdAt, updatedAt, totalItems, completedItems, progress, isComplete, relatedChecklists, items]
     ChecklistSummary:
       type: object
       properties:
@@ -414,7 +485,40 @@ components:
           type: integer
         progress:
           type: integer
-      required: [id, title, createdAt, updatedAt, totalItems, completedItems, progress]
+        isComplete:
+          type: boolean
+        childChecklistCount:
+          type: integer
+      required: [id, title, createdAt, updatedAt, totalItems, completedItems, progress, isComplete, childChecklistCount]
+    ChecklistRelationType:
+      type: string
+      enum: [supports, queue, belongs_to]
+    ChecklistRelation:
+      type: object
+      properties:
+        id:
+          type: integer
+        parentChecklistId:
+          type: integer
+        childChecklistId:
+          type: integer
+        relationType:
+          $ref: "#/components/schemas/ChecklistRelationType"
+        createdAt:
+          type: string
+          format: date-time
+        checklist:
+          $ref: "#/components/schemas/ChecklistSummary"
+      required: [id, parentChecklistId, childChecklistId, relationType, createdAt, checklist]
+    ChecklistRelationInput:
+      type: object
+      properties:
+        childChecklistId:
+          type: integer
+          minimum: 1
+        relationType:
+          $ref: "#/components/schemas/ChecklistRelationType"
+      required: [childChecklistId]
     Collection:
       type: object
       properties:
@@ -471,6 +575,8 @@ components:
           minLength: 1
         status:
           $ref: "#/components/schemas/ChecklistStatus"
+        note:
+          type: string
       minProperties: 1
     ChecklistItemInput:
       type: object
@@ -478,6 +584,8 @@ components:
         title:
           type: string
           minLength: 1
+        note:
+          type: string
       required: [title]
     ChecklistStats:
       type: object

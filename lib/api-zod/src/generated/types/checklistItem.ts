@@ -12,6 +12,7 @@ export interface ChecklistItem {
   checklistId: number;
   position: number;
   title: string;
+  note: string;
   status: ChecklistStatus;
   createdAt: Date;
   updatedAt: Date;

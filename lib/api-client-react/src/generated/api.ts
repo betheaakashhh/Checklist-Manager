@@ -25,6 +25,8 @@ import type {
   ChecklistItem,
   ChecklistItemInput,
   ChecklistItemUpdate,
+  ChecklistRelation,
+  ChecklistRelationInput,
   ChecklistStats,
   ChecklistSummary,
   ChecklistUpdate,
@@ -1166,6 +1168,228 @@ export const useUpdateChecklistItem = <TError = ErrorType<Error>,
         TContext
       > => {
       return useMutation(getUpdateChecklistItemMutationOptions(options));
+    }
+
+export const getListChecklistRelationsUrl = (id: number,) => {
+
+
+
+
+  return `/api/checklists/${id}/relations`
+}
+
+/**
+ * @summary List checklists connected beneath a parent checklist
+ */
+export const listChecklistRelations = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<ChecklistRelation[]> => {
+
+  return customFetch<ChecklistRelation[]>(getListChecklistRelationsUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChecklistRelationsQueryKey = (id: number,) => {
+    return [
+    `/api/checklists/${id}/relations`
+    ] as const;
+    }
+
+
+export const getListChecklistRelationsQueryOptions = <TData = Awaited<ReturnType<typeof listChecklistRelations>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChecklistRelations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChecklistRelationsQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChecklistRelations>>> = ({ signal }) => listChecklistRelations(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChecklistRelations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChecklistRelationsQueryResult = NonNullable<Awaited<ReturnType<typeof listChecklistRelations>>>
+export type ListChecklistRelationsQueryError = ErrorType<void>
+
+
+/**
+ * @summary List checklists connected beneath a parent checklist
+ */
+
+export function useListChecklistRelations<TData = Awaited<ReturnType<typeof listChecklistRelations>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChecklistRelations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChecklistRelationsQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateChecklistRelationUrl = (id: number,) => {
+
+
+
+
+  return `/api/checklists/${id}/relations`
+}
+
+/**
+ * @summary Connect a child checklist to a parent checklist
+ */
+export const createChecklistRelation = async (id: number,
+    checklistRelationInput: ChecklistRelationInput, options?: Parameters<typeof customFetch>[1]): Promise<ChecklistRelation> => {
+
+  return customFetch<ChecklistRelation>(getCreateChecklistRelationUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(checklistRelationInput)
+  }
+);}
+
+
+
+
+
+export const getCreateChecklistRelationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChecklistRelation>>, TError,{id: number;data: BodyType<ChecklistRelationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createChecklistRelation>>, TError,{id: number;data: BodyType<ChecklistRelationInput>}, TContext> => {
+
+const mutationKey = ['createChecklistRelation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createChecklistRelation>>, {id: number;data: BodyType<ChecklistRelationInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createChecklistRelation(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateChecklistRelationMutationResult = NonNullable<Awaited<ReturnType<typeof createChecklistRelation>>>
+    export type CreateChecklistRelationMutationBody = BodyType<ChecklistRelationInput>
+    export type CreateChecklistRelationMutationError = ErrorType<void>
+
+    /**
+ * @summary Connect a child checklist to a parent checklist
+ */
+export const useCreateChecklistRelation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChecklistRelation>>, TError,{id: number;data: BodyType<ChecklistRelationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createChecklistRelation>>,
+        TError,
+        {id: number;data: BodyType<ChecklistRelationInput>},
+        TContext
+      > => {
+      return useMutation(getCreateChecklistRelationMutationOptions(options));
+    }
+
+export const getDeleteChecklistRelationUrl = (id: number,
+    relationId: number,) => {
+
+
+
+
+  return `/api/checklists/${id}/relations/${relationId}`
+}
+
+/**
+ * @summary Remove a child checklist connection
+ */
+export const deleteChecklistRelation = async (id: number,
+    relationId: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteChecklistRelationUrl(id,relationId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteChecklistRelationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChecklistRelation>>, TError,{id: number;relationId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteChecklistRelation>>, TError,{id: number;relationId: number}, TContext> => {
+
+const mutationKey = ['deleteChecklistRelation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteChecklistRelation>>, {id: number;relationId: number}> = (props) => {
+          const {id,relationId} = props ?? {};
+
+          return  deleteChecklistRelation(id,relationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteChecklistRelationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteChecklistRelation>>>
+
+    export type DeleteChecklistRelationMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove a child checklist connection
+ */
+export const useDeleteChecklistRelation = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChecklistRelation>>, TError,{id: number;relationId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteChecklistRelation>>,
+        TError,
+        {id: number;relationId: number},
+        TContext
+      > => {
+      return useMutation(getDeleteChecklistRelationMutationOptions(options));
     }
 
 export const getCreateChecklistItemUrl = (id: number,) => {

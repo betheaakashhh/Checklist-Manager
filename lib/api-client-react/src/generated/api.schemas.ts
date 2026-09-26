@@ -28,9 +28,40 @@ export interface ChecklistItem {
   checklistId: number;
   position: number;
   title: string;
+  note: string;
   status: ChecklistStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export type ChecklistRelationType = typeof ChecklistRelationType[keyof typeof ChecklistRelationType];
+
+
+export const ChecklistRelationType = {
+  supports: 'supports',
+  queue: 'queue',
+  belongs_to: 'belongs_to',
+} as const;
+
+export interface ChecklistSummary {
+  id: number;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  totalItems: number;
+  completedItems: number;
+  progress: number;
+  isComplete: boolean;
+  childChecklistCount: number;
+}
+
+export interface ChecklistRelation {
+  id: number;
+  parentChecklistId: number;
+  childChecklistId: number;
+  relationType: ChecklistRelationType;
+  createdAt: string;
+  checklist: ChecklistSummary;
 }
 
 export interface Checklist {
@@ -42,17 +73,16 @@ export interface Checklist {
   totalItems: number;
   completedItems: number;
   progress: number;
+  isComplete: boolean;
+  childChecklistCount?: number;
   items: ChecklistItem[];
+  relatedChecklists: ChecklistRelation[];
 }
 
-export interface ChecklistSummary {
-  id: number;
-  title: string;
-  createdAt: string;
-  updatedAt: string;
-  totalItems: number;
-  completedItems: number;
-  progress: number;
+export interface ChecklistRelationInput {
+  /** @minimum 1 */
+  childChecklistId: number;
+  relationType?: ChecklistRelationType;
 }
 
 export interface Collection {
@@ -88,11 +118,13 @@ export interface ChecklistItemUpdate {
   /** @minLength 1 */
   title?: string;
   status?: ChecklistStatus;
+  note?: string;
 }
 
 export interface ChecklistItemInput {
   /** @minLength 1 */
   title: string;
+  note?: string;
 }
 
 export interface ChecklistActivity {
